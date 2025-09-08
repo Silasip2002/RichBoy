@@ -3,6 +3,8 @@ Phase 1 – Project Setup (Week 1)
 
 Goal: Set up a working skeleton with frontend, backend, and database connected.
 
+
+
 Repository Setup
 
 Create a GitHub repo with two folders: /frontend and /backend.
