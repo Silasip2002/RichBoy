@@ -1,0 +1,11 @@
+# Node
+node_modules
+dist
+.env
+npm-debug.log
+
+# Python
+__pycache__/
+*.pyc
+.env
+db.sqlite3

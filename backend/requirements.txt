@@ -1,0 +1,5 @@
+django
+langchain
+chromadb
+psycopg2-binary
+djangorestframework
