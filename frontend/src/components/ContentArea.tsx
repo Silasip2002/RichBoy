@@ -1,6 +1,7 @@
 import React from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
+import DashboardCard from './DashboardCard';
 
 interface ContentAreaProps {
   selectedMenuItem: string;
@@ -11,7 +12,12 @@ const ContentArea: React.FC<ContentAreaProps> = ({ selectedMenuItem }) => {
 
   switch (selectedMenuItem) {
     case 'Dashboard':
-      content = <Typography paragraph>Welcome to your Dashboard!</Typography>;
+      content = (
+        <>
+          <Typography paragraph>Welcome to your Dashboard!</Typography>
+          <DashboardCard />
+        </>
+      );
       break;
     case 'Profile':
       content = <Typography paragraph>View and edit your profile here.</Typography>;

@@ -24,17 +24,16 @@ export default function Home() {
         <link rel="icon" href="/favicon.ico" />
       </Head>
       <Header />
+      <Toolbar /> {/* Spacer for the fixed AppBar */}
       <Box sx={{ display: 'flex', flexGrow: 1 }}> {/* This box contains sidebar and main content */}
         <Sidebar onMenuItemClick={handleMenuItemClick} selectedMenuItem={selectedMenuItem} />
         <Box
           component="main"
           sx={{
             flexGrow: 1,
-            p: 3,
-            marginLeft: `${drawerWidth}px`, // Push content to the right of the sidebar
+            p: 3, // Add padding to the main content area
           }}
         >
-          <Toolbar /> {/* This is to offset the AppBar */}
           <ContentArea selectedMenuItem={selectedMenuItem} />
         </Box>
       </Box>

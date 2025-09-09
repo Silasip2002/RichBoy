@@ -1,7 +1,5 @@
 import React from 'react';
 import Box from '@mui/material/Box';
-import Drawer from '@mui/material/Drawer';
-import Toolbar from '@mui/material/Toolbar';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
@@ -19,33 +17,31 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ onMenuItemClick, selectedMenuItem }) => {
   return (
-    <Drawer
-      variant="permanent"
+    <Box
       sx={{
         width: drawerWidth,
         flexShrink: 0,
-        [`& .MuiDrawer-paper`]: { width: drawerWidth, boxSizing: 'border-box', marginTop: '64px' }, // Offset by AppBar height
+        // No fixed positioning here, it will be part of the flex layout in index.tsx
+        // The height will be managed by the parent flex container.
+        borderRight: '1px solid rgba(0, 0, 0, 0.12)', // Add a visual separator
       }}
     >
-      {/* Removed Toolbar here as it was creating extra whitespace */}
-      <Box sx={{ overflow: 'auto' }}>
-        <List>
-          {[ 'Dashboard', 'Profile', 'Settings', 'Reports' ].map((text, index) => (
-            <ListItem key={text} disablePadding>
-              <ListItemButton
-                selected={selectedMenuItem === text}
-                onClick={() => onMenuItemClick(text)}
-              >
-                <ListItemIcon>
-                  {index % 2 === 0 ? <InboxIcon /> : <MailIcon />}
-                </ListItemIcon>
-                <ListItemText primary={text} />
-              </ListItemButton>
-            </ListItem>
-          ))}
-        </List>
-      </Box>
-    </Drawer>
+      <List>
+        {[ 'Dashboard', 'Profile', 'Settings', 'Reports' ].map((text, index) => (
+          <ListItem key={text} disablePadding>
+            <ListItemButton
+              selected={selectedMenuItem === text}
+              onClick={() => onMenuItemClick(text)}
+            >
+              <ListItemIcon>
+                {index % 2 === 0 ? <InboxIcon /> : <MailIcon />}
+              </ListItemIcon>
+              <ListItemText primary={text} />
+            </ListItemButton>
+          </ListItem>
+        ))}
+      </List>
+    </Box>
   );
 };
 
