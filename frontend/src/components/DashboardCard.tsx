@@ -1,6 +1,5 @@
 import React from 'react';
 import { Card, CardContent, Typography, Box } from '@mui/material';
-import Grid from '@mui/material/Grid';
 
 const DashboardCard: React.FC = () => {
   // Static data for now, will be dynamic later
@@ -16,43 +15,43 @@ const DashboardCard: React.FC = () => {
   return (
     <Card sx={{ minWidth: 275, mb: 3 }}>
       <CardContent >
-        <Typography sx={{ fontSize: 24 }} color="text.main" gutterBottom>
+        <Typography sx={{ fontSize: 14 }} color="text.secondary" gutterBottom>
           Portfolio Overview
         </Typography>
-        <Grid container spacing={0} sx={{ width: '100%', flexGrow: 1 }}> {/* Use Grid container for the row */}
-          <Grid item xs={3} component="div" sx={{ flexGrow: 1 }}> {/* Each item takes 3 out of 12 columns */}
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', width: '100%', flexGrow: 1 }}> {/* Replaced Grid container with Box */}
+          <Box sx={{ width: '25%', flexGrow: 1 }}> {/* Replaced Grid item with Box */}
             <Typography variant="subtitle2" color="text.secondary">
               Total Portfolio Value
             </Typography>
             <Typography variant="h5" component="div">
               {totalPortfolioValue}
             </Typography>
-          </Grid>
-          <Grid item xs={3} component="div" sx={{ flexGrow: 1 }}>
+          </Box>
+          <Box sx={{ width: '25%', flexGrow: 1 }}> {/* Replaced Grid item with Box */}
             <Typography variant="subtitle2" color="text.secondary">
-              Today's Change
+              Today&apos;s Change
             </Typography>
             <Typography variant="h5" component="div" sx={{ color: changeColor }}>
               {todaysChange}
             </Typography>
-          </Grid>
-          <Grid item xs={3} component="div" sx={{ flexGrow: 1 }}>
+          </Box>
+          <Box sx={{ width: '25%', flexGrow: 1 }}> {/* Replaced Grid item with Box */}
             <Typography variant="subtitle2" color="text.secondary">
               Annual Return
             </Typography>
             <Typography variant="h5" component="div">
               {annualReturn}
             </Typography>
-          </Grid>
-          <Grid item xs={3} component="div" sx={{ flexGrow: 1 }}>
+          </Box>
+          <Box sx={{ width: '25%', flexGrow: 1 }}> {/* Replaced Grid item with Box */}
             <Typography variant="subtitle2" color="text.secondary">
               Cash Balance
             </Typography>
             <Typography variant="h5" component="div">
               {cashBalance}
             </Typography>
-          </Grid>
-        </Grid>
+          </Box>
+        </Box>
       </CardContent>
     </Card>
   );

@@ -29,7 +29,7 @@ export default function Home() {
         <Sidebar onMenuItemClick={handleMenuItemClick} selectedMenuItem={selectedMenuItem} />
         <Box
           component="main"
-          sx={{
+                    sx={{
             flexGrow: 1,
             p: 3, // Add padding to the main content area
           }}
