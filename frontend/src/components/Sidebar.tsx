@@ -27,7 +27,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onMenuItemClick, selectedMenuItem }) 
       }}
     >
       <List>
-        {[ 'Dashboard', 'Profile', 'Settings', 'Reports' ].map((text, index) => (
+        {[ 'Dashboard', 'Transaction', 'Settings', 'Reports' ].map((text, index) => (
           <ListItem key={text} disablePadding>
             <ListItemButton
               selected={selectedMenuItem === text}

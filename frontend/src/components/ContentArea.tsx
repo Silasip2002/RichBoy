@@ -3,6 +3,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import DashboardCard from './DashboardCard';
 import PortfolioPerformanceCard from './PortfolioPerformanceCard';
+import TransactionsPage from '../pages/transactions';
 
 interface ContentAreaProps {
   selectedMenuItem: string;
@@ -20,6 +21,9 @@ const ContentArea: React.FC<ContentAreaProps> = ({ selectedMenuItem }) => {
           <PortfolioPerformanceCard />
         </>
       );
+      break;
+    case 'Transaction':
+      content = <TransactionsPage />;
       break;
     case 'Profile':
       content = <Typography paragraph>View and edit your profile here.</Typography>;

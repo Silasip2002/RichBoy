@@ -18,8 +18,8 @@ const DashboardCard: React.FC = () => {
         <Typography sx={{ fontSize: 14 }} color="text.secondary" gutterBottom>
           Portfolio Overview
         </Typography>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', width: '100%', flexGrow: 1 }}> {/* Replaced Grid container with Box */}
-          <Box sx={{ width: '25%', flexGrow: 1 }}> {/* Replaced Grid item with Box */}
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', width: '100%', flexGrow: 1 }}> 
+          <Box sx={{ width: '25%', flexGrow: 1 }}> 
             <Typography variant="subtitle2" color="text.secondary">
               Total Portfolio Value
             </Typography>
@@ -27,7 +27,7 @@ const DashboardCard: React.FC = () => {
               {totalPortfolioValue}
             </Typography>
           </Box>
-          <Box sx={{ width: '25%', flexGrow: 1 }}> {/* Replaced Grid item with Box */}
+          <Box sx={{ width: '25%', flexGrow: 1 }}> 
             <Typography variant="subtitle2" color="text.secondary">
               Today&apos;s Change
             </Typography>
@@ -35,7 +35,7 @@ const DashboardCard: React.FC = () => {
               {todaysChange}
             </Typography>
           </Box>
-          <Box sx={{ width: '25%', flexGrow: 1 }}> {/* Replaced Grid item with Box */}
+          <Box sx={{ width: '25%', flexGrow: 1 }}> 
             <Typography variant="subtitle2" color="text.secondary">
               Annual Return
             </Typography>

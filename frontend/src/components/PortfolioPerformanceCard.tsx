@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import { Card, CardContent, Typography, Box, Divider, Button, ButtonGroup } from '@mui/material';
 import { LineChart, PieChart } from '@mui/x-charts';
 
-const PortfolioPerformanceCard: React.FC = () => {
-  const [selectedTimeframe, setSelectedTimeframe] = useState('1Y'); // Default to 1 Year
+type Timeframe = '1M' | '3M' | '6M' | 'YTD' | '1Y' | 'All';
 
-  const timeframes = ['1M', '3M', '6M', 'YTD', '1Y', 'All'];
+const PortfolioPerformanceCard: React.FC = () => {
+  const [selectedTimeframe, setSelectedTimeframe] = useState<Timeframe>('1Y'); // Default to 1 Year
+
+  const timeframes: Timeframe[] = ['1M', '3M', '6M', 'YTD', '1Y', 'All'];
 
   // Mock data for Line Chart
-  const lineChartData = {
+  const lineChartData: { [key in Timeframe]: { series: { data: number[] }[], xAxis: { scaleType: 'point', data: string[] }[] } } = {
     '1M': { series: [{ data: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] }], xAxis: [{ scaleType: 'point', data: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'] }] },
     '3M': { series: [{ data: [10, 20, 15, 25, 22, 30, 28, 35, 32, 40] }], xAxis: [{ scaleType: 'point', data: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6', 'Week 7', 'Week 8', 'Week 9', 'Week 10'] }] },
     '6M': { series: [{ data: [50, 45, 60, 55, 70, 65, 80, 75, 90, 85] }], xAxis: [{ scaleType: 'point', data: ['Month 1', 'Month 2', 'Month 3', 'Month 4', 'Month 5', 'Month 6', 'Month 7', 'Month 8', 'Month 9', 'Month 10'] }] },
@@ -21,8 +23,9 @@ const PortfolioPerformanceCard: React.FC = () => {
   const pieChartData = [
     { id: 0, value: 10, label: 'Stocks' },
     { id: 1, value: 15, label: 'Bonds' },
-    { id: 2, value: 20, label: 'Real Estate' },
+    { id: 2, value: 10, label: 'Real Estate' },
     { id: 3, value: 5, label: 'Cash' },
+    { id: 4, value: 10, label: 'Crypto' },
   ];
 
   return (
@@ -76,7 +79,7 @@ const PortfolioPerformanceCard: React.FC = () => {
             series={[
               {
                 data: pieChartData,
-                highlightScope: { faded: 'global', highlighted: 'item' },
+                highlightScope: { fade: 'global', highlight: 'item' },
                 faded: { innerRadius: 30, additionalRadius: -30, color: 'gray' },
               },
             ]}
