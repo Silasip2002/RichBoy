@@ -15,8 +15,13 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { useAuth } from '../contexts/AuthContext';
 
-const AddTransactionCard: React.FC = () => {
+interface AddTransactionCardProps {
+    onTransactionAdded: () => void;
+}
+
+const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAdded }) => {
   const [transactionType, setTransactionType] = useState('expense');
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState('USD');
@@ -24,22 +29,39 @@ const AddTransactionCard: React.FC = () => {
   const [category, setCategory] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [isRecurring, setIsRecurring] = useState(false);
+  const [account, setAccount] = useState('cash');
+  const { token } = useAuth();
 
   const handleTransactionTypeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setTransactionType(event.target.value);
   };
 
-  const handleSaveTransaction = () => {
-    // Logic to save the transaction
-    console.log({
-      transactionType,
-      amount,
-      currency,
-      description,
-      category,
-      date,
-      isRecurring,
+  const handleSaveTransaction = async () => {
+    const response = await fetch('http://localhost:8000/api/transactions/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+            transaction_type: transactionType,
+            amount,
+            currency,
+            description,
+            category,
+            date,
+            is_recurring: isRecurring,
+        }),
     });
+
+    if (response.ok) {
+        // Handle success
+        console.log('Transaction saved');
+        onTransactionAdded();
+    } else {
+        // Handle error
+        console.error('Failed to save transaction');
+    }
   };
 
   return (
@@ -104,6 +126,16 @@ const AddTransactionCard: React.FC = () => {
             <MenuItem value="salary">Salary</MenuItem>
             <MenuItem value="utilities">Utilities</MenuItem>
             <MenuItem value="other">Other</MenuItem>
+          </Select>
+        </FormControl>
+        <FormControl fullWidth sx={{ mb: 2 }}>
+          <Select
+            value={account}
+            onChange={(e) => setAccount(e.target.value)}
+            displayEmpty
+          >
+            <MenuItem value="cash">Cash</MenuItem>
+            <MenuItem value="bank">Bank</MenuItem>
           </Select>
         </FormControl>
         <TextField

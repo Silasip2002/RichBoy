@@ -1,6 +1,11 @@
 from django.db import models
 from django.contrib.auth.models import User
 
+ACCOUNT_CHOICES = [
+    ('cash', 'Cash'),
+    ('bank', 'Bank'),
+]
+
 class Transaction(models.Model):
     TRANSACTION_TYPE_CHOICES = [
         ('income', 'Income'),
@@ -28,6 +33,7 @@ class Transaction(models.Model):
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
     date = models.DateField()
     is_recurring = models.BooleanField(default=False)
+    account = models.CharField(max_length=20, choices=ACCOUNT_CHOICES, default='cash')
 
     def __str__(self):
         return f"{self.user.username} - {self.transaction_type} - {self.amount} {self.currency} - {self.date}"

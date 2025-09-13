@@ -19,7 +19,8 @@ class UserSerializerWithToken(UserSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'token']
+        fields = ['id', 'username', 'email', 'password', 'token']
+        extra_kwargs = {'password': {'write_only': True}}
 
     def get_token(self, obj):
         token = RefreshToken.for_user(obj)
