@@ -4,6 +4,7 @@ import Typography from '@mui/material/Typography';
 import DashboardCard from './DashboardCard';
 import PortfolioPerformanceCard from './PortfolioPerformanceCard';
 import TransactionsPage from '../pages/transactions';
+import Assets from '../pages/assets';
 
 interface ContentAreaProps {
   selectedMenuItem: string;
@@ -28,8 +29,8 @@ const ContentArea: React.FC<ContentAreaProps> = ({ selectedMenuItem }) => {
     case 'Profile':
       content = <Typography paragraph>View and edit your profile here.</Typography>;
       break;
-    case 'Settings':
-      content = <Typography paragraph>Adjust your application settings.</Typography>;
+    case 'Assets':
+      content = <Assets />;
       break;
     case 'Reports':
       content = <Typography paragraph>Access various reports and analytics.</Typography>;

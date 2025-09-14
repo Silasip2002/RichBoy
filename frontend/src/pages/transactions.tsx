@@ -34,9 +34,12 @@ function TabPanel(props: TabPanelProps) {
 }
 
 const TransactionsPage = () => {
-    const [transactions, setTransactions] = useState([]);
-    const { token } = useAuth();
     const [value, setValue] = useState(0);
+    const [transactions, setTransactions] = useState([]);
+    const [count, setCount] = useState(0);
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
+    const { token } = useAuth();
 
     const handleChange = (event: React.SyntheticEvent, newValue: number) => {
         setValue(newValue);
@@ -44,21 +47,33 @@ const TransactionsPage = () => {
 
     const fetchTransactions = useCallback(async () => {
         if (token) {
-            const response = await fetch('http://localhost:8000/api/transactions/', {
+            const response = await fetch(`http://localhost:8000/api/transactions/?page=${page + 1}&page_size=${rowsPerPage}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                 },
             });
             if (response.ok) {
                 const data = await response.json();
-                setTransactions(data);
+                setTransactions(data.results);
+                setCount(data.count);
             }
         }
-    }, [token]);
+    }, [token, page, rowsPerPage]);
 
     useEffect(() => {
-        fetchTransactions();
-    }, [fetchTransactions]);
+        if (value === 0) {
+            fetchTransactions();
+        }
+    }, [value, fetchTransactions]);
+
+    const handleChangePage = (event: unknown, newPage: number) => {
+        setPage(newPage);
+    };
+
+    const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
+    };
 
     return (
         <Box sx={{ width: '100%' }}>
@@ -75,8 +90,15 @@ const TransactionsPage = () => {
                     <Grid item xs={12} md={4}>
                         <AddTransactionCard onTransactionAdded={fetchTransactions} />
                     </Grid>
-                    <Grid item xs={12} md={8}>
-                        <TransactionHistory transactions={transactions} />
+                    <Grid item xs={12} md={8} sx={{width:'100%'}}>
+                        <TransactionHistory
+                            transactions={transactions}
+                            count={count}
+                            page={page}
+                            rowsPerPage={rowsPerPage}
+                            onPageChange={handleChangePage}
+                            onRowsPerPageChange={handleChangeRowsPerPage}
+                        />
                     </Grid>
                 </Grid>
             </TabPanel>

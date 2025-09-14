@@ -10,7 +10,7 @@ const DashboardCard: React.FC = () => {
 
   // Determine color for Today's Change
   const isPositiveChange = todaysChange.startsWith('+');
-  const changeColor = isPositiveChange ? 'green' : 'red';
+  const changeColor = isPositiveChange ? 'success.main' : 'error.main';
 
   return (
     <Card sx={{ minWidth: 275, mb: 3 }}>

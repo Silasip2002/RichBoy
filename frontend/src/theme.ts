@@ -10,7 +10,7 @@ const theme = createTheme({
       main: '#19857b',
     },
     error: {
-      main: '#red',
+      main: '#f44336',
     },
   },
 });

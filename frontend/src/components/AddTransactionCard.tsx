@@ -65,7 +65,7 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
   };
 
   return (
-    <Card>
+    <Card sx={{ height: '100%' }}>
       <CardContent>
         <Typography variant="h5" gutterBottom>
           Add Transaction

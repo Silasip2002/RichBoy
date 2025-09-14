@@ -57,15 +57,15 @@ const PortfolioPerformanceCard: React.FC = () => {
         <Box sx={{ display: 'flex', flexWrap: 'wrap', mb: 2 }}>
           <Box sx={{ width: '33.33%' }}>
             <Typography variant="subtitle2" color="text.secondary">Daily Change</Typography>
-            <Typography variant="h6" color="green">+$123.45</Typography>
+            <Typography variant="h6" color="success.main">+$123.45</Typography>
           </Box>
           <Box sx={{ width: '33.33%' }}>
             <Typography variant="subtitle2" color="text.secondary">Weekly Change</Typography>
-            <Typography variant="h6" color="red">-$567.89</Typography>
+            <Typography variant="h6" color="error.main">-$567.89</Typography>
           </Box>
           <Box sx={{ width: '33.33%' }}>
             <Typography variant="subtitle2" color="text.secondary">Monthly Change</Typography>
-            <Typography variant="h6" color="green">+$1,234.56</Typography>
+            <Typography variant="h6" color="success.main">+$1,234.56</Typography>
           </Box>
         </Box>
 

@@ -9,7 +9,8 @@ import {
     TableContainer,
     TableHead,
     TableRow,
-    Paper
+    Paper,
+    TablePagination
 } from '@mui/material';
 
 interface Transaction {
@@ -20,21 +21,34 @@ interface Transaction {
     description: string;
     category: string;
     date: string;
+    account: string;
 }
 
 interface TransactionHistoryProps {
     transactions: Transaction[];
+    count: number;
+    page: number;
+    rowsPerPage: number;
+    onPageChange: (event: unknown, newPage: number) => void;
+    onRowsPerPageChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
-const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions }) => {
+const TransactionHistory: React.FC<TransactionHistoryProps> = ({
+    transactions,
+    count,
+    page,
+    rowsPerPage,
+    onPageChange,
+    onRowsPerPageChange,
+}) => {
     return (
-        <Card>
+        <Card sx={{ width: '100%' }}>
             <CardContent>
                 <Typography variant="h5" gutterBottom>
                     Transaction History
                 </Typography>
                 <TableContainer component={Paper}>
-                    <Table sx={{ minWidth: 650 }} aria-label="simple table">
+                    <Table aria-label="simple table">
                         <TableHead>
                             <TableRow>
                                 <TableCell>Date</TableCell>
@@ -62,6 +76,15 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
                         </TableBody>
                     </Table>
                 </TableContainer>
+                <TablePagination
+                    rowsPerPageOptions={[5, 10, 25]}
+                    component="div"
+                    count={count}
+                    rowsPerPage={rowsPerPage}
+                    page={page}
+                    onPageChange={onPageChange}
+                    onRowsPerPageChange={onRowsPerPageChange}
+                />
             </CardContent>
         </Card>
     );
