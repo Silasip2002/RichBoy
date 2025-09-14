@@ -7,11 +7,13 @@ const LoginPage: React.FC = () => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const { login } = useAuth();
     const router = useRouter();
 
     const handleLogin = async () => {
         setLoading(true);
+        setError(null);
         try {
             const response = await fetch('http://localhost:8000/api/users/login/', {
                 method: 'POST',
@@ -25,10 +27,11 @@ const LoginPage: React.FC = () => {
                 const data = await response.json();
                 await login(data.access);
             } else {
-                // Handle error
-                console.error('Login failed');
+                const errorData = await response.json();
+                setError(errorData.detail || 'Login failed');
             }
         } catch (error) {
+            setError('Login failed. Please try again.');
             console.error('Login failed', error);
         } finally {
             setLoading(false);
@@ -65,6 +68,11 @@ const LoginPage: React.FC = () => {
                         onChange={(e) => setPassword(e.target.value)}
                         disabled={loading}
                     />
+                    {error && (
+                        <Typography color="error" sx={{ mb: 2 }}>
+                            {error}
+                        </Typography>
+                    )}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                         <Button variant="contained" color="primary" onClick={handleLogin} disabled={loading}>
                             Login

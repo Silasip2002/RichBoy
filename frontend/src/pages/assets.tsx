@@ -1,20 +1,89 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import AssetCard from '../components/AssetCard';
 import AssetList from '../components/AssetList';
+import { useAuth } from '../contexts/AuthContext';
 
 
 const Assets: React.FC = () => {
-  const totalAssetValue = "$1,500,000.00";
-  const assets = [
-    { title: 'Stocks', value: '$800,000.00' },
-    { title: 'Cryptocurrency', value: '$400,000.00' },
-    { title: 'Real Estate', value: '$250,000.00' },
-  ];
+  const { token } = useAuth();
+  const [assets, setAssets] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
 
-  const allCards = [{ title: 'Total Asset Value', value: totalAssetValue }, ...assets];
+  useEffect(() => {
+    const fetchAccounts = async () => {
+        try {
+            const response = await fetch('http://localhost:8000/api/accounts/', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setAccounts(data.results);
+            }
+        } catch (error) {
+            console.error('Failed to fetch accounts', error);
+        }
+    };
+
+    const fetchAssets = async () => {
+        try {
+            const response = await fetch('http://localhost:8000/api/assets/', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+            if (response.ok) {
+                const data = await response.json();
+                const assetsWithMarketPrice = await Promise.all(data.results.map(async (asset: any) => {
+                    if (asset.asset_type === 'stocks' && asset.symbol) {
+                        try {
+                            const priceResponse = await fetch(`http://localhost:8000/api/get_stock_price/?symbol=${asset.symbol}`, {
+                                headers: {
+                                    'Authorization': `Bearer ${token}`,
+                                },
+                            });
+                            if (priceResponse.ok) {
+                                const priceData = await priceResponse.json();
+                                return { ...asset, price: priceData.price };
+                            }
+                        } catch (error) {
+                            console.error(`Failed to fetch price for ${asset.symbol}`, error);
+                        }
+                    }
+                    return asset;
+                }));
+                setAssets(assetsWithMarketPrice);
+            }
+        } catch (error) {
+            console.error('Failed to fetch assets', error);
+        }
+    };
+
+    if (token) {
+        fetchAccounts();
+        fetchAssets();
+    }
+  }, [token]);
+
+  const totalAssetValue = assets.reduce((acc, asset) => acc + (asset.price * asset.quantity), 0).toFixed(2);
+  const assetTypes = assets.reduce((acc, asset) => {
+    if (!acc[asset.asset_type]) {
+        acc[asset.asset_type] = 0;
+    }
+    acc[asset.asset_type] += asset.price * asset.quantity;
+    return acc;
+  }, {} as { [key: string]: number });
+
+  const assetCards = Object.entries(assetTypes).map(([title, value]) => ({
+    title,
+    value: value.toFixed(2),
+  }));
+
+  const allCards = [{ title: 'Total Asset Value', value: totalAssetValue }, ...assetCards];
 
   return (
     <div> 
@@ -30,7 +99,7 @@ const Assets: React.FC = () => {
             </Grid>
           ))}
         </Grid>
-        <AssetList />
+        <AssetList assets={assets} setAssets={setAssets} accounts={accounts} setAccounts={setAccounts} />
       </Box>
     </div>
   );
