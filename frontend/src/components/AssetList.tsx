@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react';
-import { Card, CardContent, Box, Typography, TextField, Select, MenuItem, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Chip } from '@mui/material';
+import { Card, CardContent, Box, Typography, TextField, Select, MenuItem, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Chip, Autocomplete, Skeleton } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useAuth } from '../contexts/AuthContext';
 
-const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetStateAction<any[]>>, accounts: any[], setAccounts: React.Dispatch<React.SetStateAction<any[]>> }> = ({ assets, setAssets, accounts, setAccounts }) => {
+const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetStateAction<any[]>>, accounts: any[], setAccounts: React.Dispatch<React.SetStateAction<any[]>>, loading: boolean }> = ({ assets, setAssets, accounts, setAccounts, loading }) => {
   const { token } = useAuth();
   const [open, setOpen] = React.useState(false);
   const [addAccountOpen, setAddAccountOpen] = React.useState(false);
@@ -25,6 +25,7 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false);
   const [deletingAssetId, setDeletingAssetId] = React.useState<number | null>(null);
   const [errors, setErrors] = React.useState<{ [key: string]: string }>({});
+  const [symbolOptions, setSymbolOptions] = React.useState<{ label: string; value: string }[]>([]);
 
   const handleClickOpen = () => {
     setOpen(true);
@@ -77,7 +78,7 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
         });
         if (response.ok) {
             const data = await response.json();
-            setAssets(assets.map((asset) => (asset.id === data.id ? data : asset)));
+            setAssets(assets.map((asset) => (asset.id === data.id ? { ...data, market_price: editingAsset.market_price } : asset)));
             setEditAssetOpen(false);
             setEditingAsset(null);
         } else {
@@ -140,7 +141,7 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
         });
         if (response.ok) {
             const data = await response.json();
-            setAssets([...assets, data]);
+            setAssets([...assets, { ...data, market_price: data.price }]);
             handleClose();
         } else {
             const errorData = await response.json();
@@ -189,9 +190,9 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
         if (response.ok) {
             const data = await response.json();
             if (type === 'new') {
-                setNewAsset({ ...newAsset, price: data.price });
+                setNewAsset(prev => ({ ...prev, price: data.price, name: data.name || prev.name }));
             } else {
-                setEditingAsset({ ...editingAsset, price: data.price });
+                setEditingAsset(prev => ({ ...prev, price: data.price, name: data.name || prev.name }));
             }
         } else {
             const errorData = await response.json();
@@ -202,9 +203,31 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
     }
   };
 
+  const handleSymbolSearch = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const keywords = event.target.value;
+    if (keywords.length > 1) {
+        try {
+            const response = await fetch(`http://localhost:8000/api/search_symbols/?keywords=${keywords}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setSymbolOptions(data.map((item: any) => ({ label: `${item.symbol} - ${item.name}`, value: item.symbol })));
+            }
+        } catch (error) {
+            console.error('Failed to search symbols', error);
+        }
+    } else {
+        setSymbolOptions([]);
+    }
+  };
+
   const handleRefreshPrices = async () => {
     const updatedAssets = await Promise.all(assets.map(async (asset) => {
-        if (asset.asset_type === 'stocks') {
+        let market_price = asset.market_price;
+        if (asset.asset_type === 'stocks' && asset.symbol) {
             try {
                 const response = await fetch(`http://localhost:8000/api/get_stock_price/?symbol=${asset.symbol}`, {
                     headers: {
@@ -213,13 +236,13 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
                 });
                 if (response.ok) {
                     const data = await response.json();
-                    return { ...asset, price: data.price };
+                    market_price = data.price;
                 }
             } catch (error) {
                 console.error(`Failed to fetch price for ${asset.symbol}`, error);
             }
         }
-        return asset;
+        return { ...asset, market_price };
     }));
     setAssets(updatedAssets);
   };
@@ -244,6 +267,20 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
     }
     return <Chip label={type} color={color} size="small" />;
   };
+
+  const renderSkeleton = () => (
+    Array.from(new Array(5)).map((_, index) => (
+        <TableRow key={index}>
+            <TableCell><Skeleton variant="text" /></TableCell>
+            <TableCell><Skeleton variant="text" /></TableCell>
+            <TableCell><Skeleton variant="text" /></TableCell>
+            <TableCell><Skeleton variant="text" /></TableCell>
+            <TableCell><Skeleton variant="text" /></TableCell>
+            <TableCell><Skeleton variant="text" /></TableCell>
+            <TableCell><Skeleton variant="text" /></TableCell>
+        </TableRow>
+    ))
+  );
 
   return (
     <Card sx={{ mt: 4 }}>
@@ -277,13 +314,13 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
              </TableRow>
            </TableHead>
            <TableBody>
-             {assets.map((asset, index) => (
+             {loading ? renderSkeleton() : assets.map((asset, index) => (
                <TableRow key={index}>
                  <TableCell>{asset.name}</TableCell>
-                 <TableCell>{asset.price}</TableCell>
+                 <TableCell>{asset.market_price}</TableCell>
                  <TableCell>{asset.quantity}</TableCell>
                  <TableCell>{asset.quantity > 0 ? (asset.cost / asset.quantity).toFixed(2) : '0.00'}</TableCell>
-                 <TableCell>{(asset.price * asset.quantity).toFixed(2)}</TableCell>
+                 <TableCell>{(asset.market_price * asset.quantity).toFixed(2)}</TableCell>
                  <TableCell>{getTypeChip(asset.asset_type)}</TableCell>
                  <TableCell>
                    <IconButton size="small" aria-label="edit" onClick={() => handleEditClick(asset)}>
@@ -307,6 +344,8 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
             label="Asset Name" 
             type="text" 
             fullWidth 
+            value={newAsset.name}
+            disabled={newAsset.asset_type === 'stocks'}
             onChange={(e) => {
                 setNewAsset({ ...newAsset, name: e.target.value });
                 if (errors.name) setErrors({ ...errors, name: '' });
@@ -314,17 +353,29 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
             error={!!errors.name}
             helperText={errors.name}
             />
-           <TextField 
-            margin="dense" 
-            label="Symbol" 
-            type="text" 
-            fullWidth 
-            onChange={(e) => setNewAsset({ ...newAsset, symbol: e.target.value })} 
+           {newAsset.asset_type === 'stocks' ? (
+            <Autocomplete
+                options={symbolOptions}
+                getOptionLabel={(option) => option.label}
+                onInputChange={(event, newInputValue) => {
+                    handleSymbolSearch({ target: { value: newInputValue } } as any);
+                }}
+                onChange={(event, newValue) => {
+                    if (newValue) {
+                        setNewAsset({ ...newAsset, symbol: newValue.value });
+                        handleFetchPrice(newValue.value, 'new');
+                    }
+                }}
+                renderInput={(params) => <TextField {...params} label="Symbol" margin="dense" />}
             />
-            {newAsset.asset_type === 'stocks' && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Button onClick={() => handleFetchPrice(newAsset.symbol, 'new')} variant="outlined" sx={{ mt: 1 }}>Fetch Price</Button>
-            </Box>
+           ) : (
+            <TextField 
+                margin="dense" 
+                label="Symbol" 
+                type="text" 
+                fullWidth 
+                onChange={(e) => setNewAsset({ ...newAsset, symbol: e.target.value })} 
+            />
            )}
            <Box sx={{ mt: 1 }}>
            <Select

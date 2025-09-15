@@ -26,6 +26,7 @@ const LoginPage: React.FC = () => {
             if (response.ok) {
                 const data = await response.json();
                 await login(data.access);
+                router.push('/');
             } else {
                 const errorData = await response.json();
                 setError(errorData.detail || 'Login failed');

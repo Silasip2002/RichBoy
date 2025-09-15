@@ -1,17 +1,16 @@
 from django.contrib.auth.models import User
 from .models import UserProfile
-from .serializers import UserSerializerWithToken, UserProfileSerializer
-
+from .serializers import UserSerializerWithToken, UserProfileSerializer, UserSerializerForToken
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-
+from rest_framework.views import APIView
 
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         data = super().validate(attrs)
-        serializer = UserSerializerWithToken(self.user).data
+        serializer = UserSerializerForToken(self.user).data
         for k, v in serializer.items():
             data[k] = v
         return data
@@ -24,7 +23,9 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = (permissions.AllowAny,)
     serializer_class = UserSerializerWithToken
 
-class UserProfileView(generics.RetrieveAPIView):
+from rest_framework.views import APIView
+
+class UserProfileView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, *args, **kwargs):

@@ -54,10 +54,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
-    const login = (newToken: string) => {
+    const login = async (newToken: string) => {
         localStorage.setItem('token', newToken);
         setToken(newToken);
-        fetchUserProfile(newToken);
+        await fetchUserProfile(newToken);
         router.push('/');
     };
 
