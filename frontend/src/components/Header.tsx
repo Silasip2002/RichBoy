@@ -6,12 +6,26 @@ import IconButton from '@mui/material/IconButton';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import SettingsIcon from '@mui/icons-material/Settings';
 import AccountCircle from '@mui/icons-material/AccountCircle';
+import MenuIcon from '@mui/icons-material/Menu';
 import Box from '@mui/material/Box';
 
-const Header: React.FC = () => {
+interface HeaderProps {
+  handleDrawerToggle: () => void;
+}
+
+const Header: React.FC<HeaderProps> = ({ handleDrawerToggle }) => {
   return (
-    <AppBar position="fixed">
+    <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
       <Toolbar>
+        <IconButton
+          color="inherit"
+          aria-label="open drawer"
+          edge="start"
+          onClick={handleDrawerToggle}
+          sx={{ mr: 2, display: { sm: 'none' } }}
+        >
+          <MenuIcon />
+        </IconButton>
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
           RichBoy
         </Typography>

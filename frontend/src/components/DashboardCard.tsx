@@ -15,15 +15,12 @@ const DashboardCard: React.FC = () => {
   return (
     <Card sx={{ minWidth: 275, mb: 3 }}>
       <CardContent >
-        <Typography sx={{ fontSize: 14 }} color="text.secondary" gutterBottom>
-          Portfolio Overview
-        </Typography>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', width: '100%', flexGrow: 1 }}> 
           <Box sx={{ width: '25%', flexGrow: 1 }}> 
             <Typography variant="subtitle2" color="text.secondary">
               Total Portfolio Value
             </Typography>
-            <Typography variant="h5" component="div">
+            <Typography variant="h6" component="div" sx={{ fontSize: '1rem' }}>
               {totalPortfolioValue}
             </Typography>
           </Box>
@@ -31,7 +28,7 @@ const DashboardCard: React.FC = () => {
             <Typography variant="subtitle2" color="text.secondary">
               Today&apos;s Change
             </Typography>
-            <Typography variant="h5" component="div" sx={{ color: changeColor }}>
+            <Typography variant="h6" component="div" sx={{ fontSize: '1rem', color: changeColor }}>
               {todaysChange}
             </Typography>
           </Box>
@@ -39,7 +36,7 @@ const DashboardCard: React.FC = () => {
             <Typography variant="subtitle2" color="text.secondary">
               Annual Return
             </Typography>
-            <Typography variant="h5" component="div">
+            <Typography variant="h6" component="div" sx={{ fontSize: '1rem' }}>
               {annualReturn}
             </Typography>
           </Box>
@@ -47,7 +44,7 @@ const DashboardCard: React.FC = () => {
             <Typography variant="subtitle2" color="text.secondary">
               Cash Balance
             </Typography>
-            <Typography variant="h5" component="div">
+            <Typography variant="h6" component="div" sx={{ fontSize: '1rem' }}>
               {cashBalance}
             </Typography>
           </Box>

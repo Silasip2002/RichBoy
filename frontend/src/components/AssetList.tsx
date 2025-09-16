@@ -224,28 +224,7 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
     }
   };
 
-  const handleRefreshPrices = async () => {
-    const updatedAssets = await Promise.all(assets.map(async (asset) => {
-        let market_price = asset.market_price;
-        if (asset.asset_type === 'stocks' && asset.symbol) {
-            try {
-                const response = await fetch(`http://localhost:8000/api/get_stock_price/?symbol=${asset.symbol}`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                    },
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    market_price = data.price;
-                }
-            } catch (error) {
-                console.error(`Failed to fetch price for ${asset.symbol}`, error);
-            }
-        }
-        return { ...asset, market_price };
-    }));
-    setAssets(updatedAssets);
-  };
+  
 
   const getTypeChip = (type: string) => {
     let color: 'primary' | 'secondary' | 'default' | 'success' | 'warning' | 'error' | 'info' = 'default';
@@ -297,7 +276,6 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
              <MenuItem value="cash">Cash</MenuItem>
            </Select>
            <Button variant="contained" onClick={handleClickOpen}>Add Asset</Button>
-           <Button variant="outlined" onClick={handleRefreshPrices}>Refresh Prices</Button>
          </Box>
        </Box>
        <TableContainer >
@@ -305,9 +283,9 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
            <TableHead>
              <TableRow>
                <TableCell>Asset</TableCell>
-               <TableCell>Market Price</TableCell>
+               <TableCell>Market/Purchase Price</TableCell>
+               <TableCell>Change</TableCell>
                <TableCell>Quantity</TableCell>
-               <TableCell>Purchase Price</TableCell>
                <TableCell>Market Value</TableCell>
                <TableCell>Type</TableCell>
                <TableCell>Actions</TableCell>
@@ -317,9 +295,32 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
              {loading ? renderSkeleton() : assets.map((asset, index) => (
                <TableRow key={index}>
                  <TableCell>{asset.name}</TableCell>
-                 <TableCell>{asset.market_price}</TableCell>
+                 <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Typography variant="body2" component="span">{asset.market_price}</Typography>
+                        <Typography variant="body2" component="span" color="text.secondary">/</Typography>
+                        <Typography variant="caption" component="span" color="text.secondary">
+                            {asset.quantity > 0 ? (asset.cost / asset.quantity).toFixed(2) : '0.00'}
+                        </Typography>
+                    </Box>
+                 </TableCell>
+                 <TableCell>
+                    {(() => {
+                        const marketValue = asset.market_price * asset.quantity;
+                        const cost = asset.cost;
+                        if (cost > 0) {
+                            const change = ((marketValue - cost) / cost) * 100;
+                            const color = change >= 0 ? 'success.main' : 'error.main';
+                            return (
+                                <Typography variant="body2" color={color}>
+                                    {change > 0 ? '+' : ''}{change.toFixed(2)}%
+                                </Typography>
+                            );
+                        }
+                        return <Typography variant="body2">-</Typography>;
+                    })()}
+                 </TableCell>
                  <TableCell>{asset.quantity}</TableCell>
-                 <TableCell>{asset.quantity > 0 ? (asset.cost / asset.quantity).toFixed(2) : '0.00'}</TableCell>
                  <TableCell>{(asset.market_price * asset.quantity).toFixed(2)}</TableCell>
                  <TableCell>{getTypeChip(asset.asset_type)}</TableCell>
                  <TableCell>

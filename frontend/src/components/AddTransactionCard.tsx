@@ -7,6 +7,7 @@ import {
   FormControl,
   FormControlLabel,
   FormLabel,
+  Grid,
   MenuItem,
   Radio,
   RadioGroup,
@@ -29,7 +30,7 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
   const [category, setCategory] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [isRecurring, setIsRecurring] = useState(false);
-  const [account, setAccount] = useState('cash');
+  const [account, setAccount] = useState('');
   const { token } = useAuth();
 
   const handleTransactionTypeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -51,6 +52,7 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
             category,
             date,
             is_recurring: isRecurring,
+            account,
         }),
     });
 
@@ -67,11 +69,11 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
   return (
     <Card sx={{ height: '100%' }}>
       <CardContent>
-        <Typography variant="h5" gutterBottom>
+        <Typography variant="h6" gutterBottom>
           Add Transaction
         </Typography>
-        <FormControl component="fieldset" sx={{ mb: 2 }}>
-          <FormLabel component="legend">Transaction Type</FormLabel>
+        <FormControl component="fieldset" sx={{ mb: 1 }}>
+          <FormLabel component="legend" sx={{ fontSize: '0.8rem' }}>Transaction Type</FormLabel>
           <RadioGroup
             row
             aria-label="transaction-type"
@@ -79,24 +81,37 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
             value={transactionType}
             onChange={handleTransactionTypeChange}
           >
-            <FormControlLabel value="income" control={<Radio />} label="Income" />
-            <FormControlLabel value="expense" control={<Radio />} label="Expense" />
+            <FormControlLabel value="income" control={<Radio size="small" />} label={<Typography variant="body2">Income</Typography>} />
+            <FormControlLabel value="expense" control={<Radio size="small" />} label={<Typography variant="body2">Expense</Typography>} />
           </RadioGroup>
         </FormControl>
         <TextField
           label="Amount"
           variant="outlined"
           fullWidth
-          sx={{ mb: 2 }}
+          size="small"
+          sx={{ mb: 1.5 }}
           type="number"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
         />
-        <FormControl fullWidth sx={{ mb: 2 }}>
+        <FormControl fullWidth sx={{ mb: 1.5 }} size="small">
           <Select
             value={currency}
             onChange={(e) => setCurrency(e.target.value)}
             displayEmpty
+            MenuProps={{
+                disableScrollLock: true,
+                anchorOrigin: {
+                    vertical: "bottom",
+                    horizontal: "left"
+                },
+                transformOrigin: {
+                    vertical: "top",
+                    horizontal: "left"
+                },
+                getContentAnchorEl: null
+            }}
           >
             <MenuItem value="USD">USD</MenuItem>
             <MenuItem value="HKD">HKD</MenuItem>
@@ -108,18 +123,31 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
           label="Description"
           variant="outlined"
           fullWidth
-          sx={{ mb: 2 }}
+          size="small"
+          sx={{ mb: 1.5 }}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
-        <FormControl fullWidth sx={{ mb: 2 }}>
+        <FormControl fullWidth sx={{ mb: 1.5 }} size="small">
           <Select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
             displayEmpty
+            MenuProps={{
+                disableScrollLock: true,
+                anchorOrigin: {
+                    vertical: "bottom",
+                    horizontal: "left"
+                },
+                transformOrigin: {
+                    vertical: "top",
+                    horizontal: "left"
+                },
+                getContentAnchorEl: null
+            }}
           >
             <MenuItem value="" disabled>
-              Select Category
+              Category
             </MenuItem>
             <MenuItem value="food">Food</MenuItem>
             <MenuItem value="transportation">Transportation</MenuItem>
@@ -128,12 +156,27 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
             <MenuItem value="other">Other</MenuItem>
           </Select>
         </FormControl>
-        <FormControl fullWidth sx={{ mb: 2 }}>
+        <FormControl fullWidth sx={{ mb: 1.5 }} size="small">
           <Select
             value={account}
             onChange={(e) => setAccount(e.target.value)}
             displayEmpty
+            MenuProps={{
+                disableScrollLock: true,
+                anchorOrigin: {
+                    vertical: "bottom",
+                    horizontal: "left"
+                },
+                transformOrigin: {
+                    vertical: "top",
+                    horizontal: "left"
+                },
+                getContentAnchorEl: null
+            }}
           >
+            <MenuItem value="" disabled>
+              Account
+            </MenuItem>
             <MenuItem value="cash">Cash</MenuItem>
             <MenuItem value="bank">Bank</MenuItem>
           </Select>
@@ -142,7 +185,8 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
           label="Date"
           variant="outlined"
           fullWidth
-          sx={{ mb: 2 }}
+          size="small"
+          sx={{ mb: 1.5 }}
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
@@ -150,10 +194,10 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
         <FormControlLabel
           control={<Switch checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} />}
           label="Recurring Transaction"
-          sx={{ mb: 2 }}
+          sx={{ mb: 1, display: 'block' }}
         />
-        <Box>
-          <Button variant="contained" color="primary" onClick={handleSaveTransaction}>
+        <Box sx={{ mt: 2 }}>
+          <Button variant="contained" color="primary" onClick={handleSaveTransaction} fullWidth>
             Save Transaction
           </Button>
         </Box>

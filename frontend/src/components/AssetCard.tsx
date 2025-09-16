@@ -10,7 +10,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ title, value }) => {
   return (
     <Card sx={{ minWidth: 275, mb: 3 }}>
       <CardContent>
-        <Typography sx={{ fontSize: 14 }} color="text.secondary" gutterBottom>
+        <Typography sx={{ fontSize: 14, textTransform: 'uppercase' }} color="text.secondary" gutterBottom>
           {title}
         </Typography>
         <Typography variant="h5" component="div">

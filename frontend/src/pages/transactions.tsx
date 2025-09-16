@@ -25,7 +25,7 @@ function TabPanel(props: TabPanelProps) {
             {...other}
         >
             {value === index && (
-                <Box sx={{ p: 3 }}>
+                <Box sx={{ p: 2 }}>
                     {children}
                 </Box>
             )}
@@ -86,11 +86,8 @@ const TransactionsPage = () => {
                 </Tabs>
             </Box>
             <TabPanel value={value} index={0}>
-                <Grid container spacing={3}>
-                    <Grid item xs={12} md={4}>
-                        <AddTransactionCard onTransactionAdded={fetchTransactions} />
-                    </Grid>
-                    <Grid item xs={12} md={8} sx={{width:'100%'}}>
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2 }}>
+                    <Box sx={{ flexGrow: 1 }}>
                         <TransactionHistory
                             transactions={transactions}
                             count={count}
@@ -99,8 +96,11 @@ const TransactionsPage = () => {
                             onPageChange={handleChangePage}
                             onRowsPerPageChange={handleChangeRowsPerPage}
                         />
-                    </Grid>
-                </Grid>
+                    </Box>
+                    <Box sx={{ width: { xs: '100%', md: '320px' }, flexShrink: 0 }}>
+                        <AddTransactionCard onTransactionAdded={fetchTransactions} />
+                    </Box>
+                </Box>
             </TabPanel>
             <TabPanel value={value} index={1}>
                 <Reports />

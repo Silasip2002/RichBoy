@@ -47,7 +47,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
                 <Typography variant="h5" gutterBottom>
                     Transaction History
                 </Typography>
-                <TableContainer component={Paper}>
+                <TableContainer component={Paper} sx={{ maxHeight: 440, overflowY: 'auto' }}>
                     <Table aria-label="simple table">
                         <TableHead>
                             <TableRow>
