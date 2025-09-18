@@ -26,6 +26,16 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
   const [deletingAssetId, setDeletingAssetId] = React.useState<number | null>(null);
   const [errors, setErrors] = React.useState<{ [key: string]: string }>({});
   const [symbolOptions, setSymbolOptions] = React.useState<{ label: string; value: string }[]>([]);
+  const [searchTerm, setSearchTerm] = React.useState('');
+  const [filteredAssets, setFilteredAssets] = React.useState(assets);
+
+  React.useEffect(() => {
+    setFilteredAssets(
+      assets.filter(asset =>
+        asset.name.split(' - ')[0].toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    );
+  }, [searchTerm, assets]);
 
   const handleClickOpen = () => {
     setOpen(true);
@@ -48,7 +58,11 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
   };
 
   const handleEditClick = (asset: any) => {
-    setEditingAsset({ ...asset, price: asset.quantity > 0 ? (asset.cost / asset.quantity).toFixed(2) : '0.00' });
+    setEditingAsset({ 
+      ...asset, 
+      price: asset.quantity > 0 ? (asset.cost / asset.quantity).toFixed(2) : '0.00',
+      quantity: Number(asset.quantity).toFixed(2)
+    });
     setEditAssetOpen(true);
   };
 
@@ -203,11 +217,10 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
     }
   };
 
-  const handleSymbolSearch = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const keywords = event.target.value;
+  const handleSymbolSearch = async (keywords: string, assetType: string) => {
     if (keywords.length > 1) {
         try {
-            const response = await fetch(`http://localhost:8000/api/search_symbols/?keywords=${keywords}`, {
+            const response = await fetch(`http://localhost:8000/api/search_symbols/?keywords=${keywords}&type=${assetType}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                 },
@@ -267,7 +280,13 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
          <Typography variant="h6">Your Assets</Typography>
          <Box sx={{ display: 'flex', gap: 2 }}>
-           <TextField label="Search Asset" variant="outlined" size="small" />
+           <TextField 
+            label="Search Asset" 
+            variant="outlined" 
+            size="small" 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            />
            <Select defaultValue="all" size="small">
              <MenuItem value="all">All Types</MenuItem>
              <MenuItem value="stocks">Stocks</MenuItem>
@@ -283,7 +302,7 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
            <TableHead>
              <TableRow>
                <TableCell>Asset</TableCell>
-               <TableCell>Market/Purchase Price</TableCell>
+               <TableCell>Price/Cost</TableCell>
                <TableCell>Change</TableCell>
                <TableCell>Quantity</TableCell>
                <TableCell>Market Value</TableCell>
@@ -292,12 +311,12 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
              </TableRow>
            </TableHead>
            <TableBody>
-             {loading ? renderSkeleton() : assets.map((asset, index) => (
+             {loading ? renderSkeleton() : filteredAssets.map((asset, index) => (
                <TableRow key={index}>
-                 <TableCell>{asset.name}</TableCell>
+                 <TableCell>{asset.name.split(' - ')[0]}</TableCell>
                  <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Typography variant="body2" component="span">{asset.market_price}</Typography>
+                        <Typography variant="body2" component="span">{Number(asset.market_price).toFixed(2)}</Typography>
                         <Typography variant="body2" component="span" color="text.secondary">/</Typography>
                         <Typography variant="caption" component="span" color="text.secondary">
                             {asset.quantity > 0 ? (asset.cost / asset.quantity).toFixed(2) : '0.00'}
@@ -320,7 +339,7 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
                         return <Typography variant="body2">-</Typography>;
                     })()}
                  </TableCell>
-                 <TableCell>{asset.quantity}</TableCell>
+                 <TableCell>{Number(asset.quantity).toFixed(2)}</TableCell>
                  <TableCell>{(asset.market_price * asset.quantity).toFixed(2)}</TableCell>
                  <TableCell>{getTypeChip(asset.asset_type)}</TableCell>
                  <TableCell>
@@ -354,12 +373,12 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
             error={!!errors.name}
             helperText={errors.name}
             />
-           {newAsset.asset_type === 'stocks' ? (
+           {newAsset.asset_type === 'stocks' || newAsset.asset_type === 'crypto' ? (
             <Autocomplete
                 options={symbolOptions}
                 getOptionLabel={(option) => option.label}
                 onInputChange={(event, newInputValue) => {
-                    handleSymbolSearch({ target: { value: newInputValue } } as any);
+                    handleSymbolSearch(newInputValue, newAsset.asset_type);
                 }}
                 onChange={(event, newValue) => {
                     if (newValue) {
@@ -416,7 +435,15 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
            {errors.account && <Typography color="error" variant="caption">{errors.account}</Typography>}
            </Box>
            <Box sx={{ mt: 2 }}>
-           <Select defaultValue="stocks" fullWidth margin="dense" onChange={(e) => setNewAsset({ ...newAsset, asset_type: e.target.value })}>
+           <Select 
+            defaultValue="stocks" 
+            fullWidth 
+            margin="dense" 
+            onChange={(e) => {
+                setNewAsset({ ...newAsset, asset_type: e.target.value });
+                setSymbolOptions([]);
+            }}
+            >
              <MenuItem value="stocks">Stocks</MenuItem>
              <MenuItem value="crypto">Cryptocurrency</MenuItem>
              <MenuItem value="real_estate">Real Estate</MenuItem>
