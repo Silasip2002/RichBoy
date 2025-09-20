@@ -25,7 +25,7 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false);
   const [deletingAssetId, setDeletingAssetId] = React.useState<number | null>(null);
   const [errors, setErrors] = React.useState<{ [key: string]: string }>({});
-  const [symbolOptions, setSymbolOptions] = React.useState<{ label: string; value: string }[]>([]);
+    const [symbolOptions, setSymbolOptions] = React.useState<{ label: string; value: string; name: string }[]>([]);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [filteredAssets, setFilteredAssets] = React.useState(assets);
 
@@ -92,7 +92,9 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
         });
         if (response.ok) {
             const data = await response.json();
-            setAssets(assets.map((asset) => (asset.id === data.id ? { ...data, market_price: editingAsset.market_price } : asset)));
+            const updatedAssets = assets.map((asset) => (asset.id === data.id ? { ...data, market_price: editingAsset.market_price } : asset));
+            setAssets(updatedAssets);
+            localStorage.setItem('assets', JSON.stringify(updatedAssets));
             setEditAssetOpen(false);
             setEditingAsset(null);
         } else {
@@ -119,7 +121,9 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
             },
         });
         if (response.ok) {
-            setAssets(assets.filter((asset) => asset.id !== deletingAssetId));
+            const updatedAssets = assets.filter((asset) => asset.id !== deletingAssetId);
+            setAssets(updatedAssets);
+            localStorage.setItem('assets', JSON.stringify(updatedAssets));
             setDeleteConfirmOpen(false);
             setDeletingAssetId(null);
         } else {
@@ -155,7 +159,9 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
         });
         if (response.ok) {
             const data = await response.json();
-            setAssets([...assets, { ...data, market_price: data.price }]);
+            const newAssets = [...assets, { ...data, market_price: data.price }];
+            setAssets(newAssets);
+            localStorage.setItem('assets', JSON.stringify(newAssets));
             handleClose();
         } else {
             const errorData = await response.json();
@@ -206,7 +212,7 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
             if (type === 'new') {
                 setNewAsset(prev => ({ ...prev, price: data.price, name: data.name || prev.name }));
             } else {
-                setEditingAsset(prev => ({ ...prev, price: data.price, name: data.name || prev.name }));
+                setEditingAsset(prev => ({ ...prev, market_price: data.price, name: data.name || prev.name }));
             }
         } else {
             const errorData = await response.json();
@@ -227,7 +233,7 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
             });
             if (response.ok) {
                 const data = await response.json();
-                setSymbolOptions(data.map((item: any) => ({ label: `${item.symbol} - ${item.name}`, value: item.symbol })));
+                                setSymbolOptions(data.map((item: any) => ({ label: `${item.symbol} - ${item.name}`, value: item.symbol, name: item.name })));
             }
         } catch (error) {
             console.error('Failed to search symbols', error);
@@ -311,68 +317,56 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
              </TableRow>
            </TableHead>
            <TableBody>
-             {loading ? renderSkeleton() : filteredAssets.map((asset, index) => (
-               <TableRow key={index}>
-                 <TableCell>{asset.name.split(' - ')[0]}</TableCell>
-                 <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Typography variant="body2" component="span">{Number(asset.market_price).toFixed(2)}</Typography>
-                        <Typography variant="body2" component="span" color="text.secondary">/</Typography>
-                        <Typography variant="caption" component="span" color="text.secondary">
-                            {asset.quantity > 0 ? (asset.cost / asset.quantity).toFixed(2) : '0.00'}
-                        </Typography>
-                    </Box>
-                 </TableCell>
-                 <TableCell>
-                    {(() => {
-                        const marketValue = asset.market_price * asset.quantity;
-                        const cost = asset.cost;
-                        if (cost > 0) {
-                            const change = ((marketValue - cost) / cost) * 100;
-                            const color = change >= 0 ? 'success.main' : 'error.main';
-                            return (
-                                <Typography variant="body2" color={color}>
-                                    {change > 0 ? '+' : ''}{change.toFixed(2)}%
+             {loading ? renderSkeleton() : filteredAssets.map((asset, index) => {
+                const marketValue = asset.market_price * asset.quantity;
+                const avgCost = asset.quantity > 0 ? asset.cost / asset.quantity : 0;
+                const change = avgCost > 0 ? ((asset.market_price - avgCost) / avgCost) * 100 : 0;
+
+                return (
+                    <TableRow key={index}>
+                        <TableCell>{asset.name.split(' - ')[0]}</TableCell>
+                        <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <Typography variant="body2" component="span">{Number(asset.market_price).toFixed(2)}</Typography>
+                                <Typography variant="body2" component="span" color="text.secondary">/</Typography>
+                                <Typography variant="caption" component="span" color="text.secondary">
+                                    {asset.quantity > 0 ? (asset.cost / asset.quantity).toFixed(2) : '0.00'}
                                 </Typography>
-                            );
-                        }
-                        return <Typography variant="body2">-</Typography>;
-                    })()}
-                 </TableCell>
-                 <TableCell>{Number(asset.quantity).toFixed(2)}</TableCell>
-                 <TableCell>{(asset.market_price * asset.quantity).toFixed(2)}</TableCell>
-                 <TableCell>{getTypeChip(asset.asset_type)}</TableCell>
-                 <TableCell>
-                   <IconButton size="small" aria-label="edit" onClick={() => handleEditClick(asset)}>
-                     <EditIcon />
-                   </IconButton>
-                   <IconButton size="small" aria-label="delete" onClick={() => handleDeleteClick(asset.id)}>
-                     <DeleteIcon sx={{ color: 'error.main' }} />
-                   </IconButton>
-                 </TableCell>
-               </TableRow>
-             ))}
+                            </Box>
+                        </TableCell>
+                        <TableCell>
+                            {(() => {
+                                if (change !== null && change !== undefined && !isNaN(change)) {
+                                    const color = change >= 0 ? 'success.main' : 'error.main';
+                                    return (
+                                        <Typography variant="body2" color={color}>
+                                            {change > 0 ? '+' : ''}{Number(change).toFixed(2)}%
+                                        </Typography>
+                                    );
+                                }
+                                return <Typography variant="body2">-</Typography>;
+                            })()}
+                        </TableCell>
+                        <TableCell>{Number(asset.quantity).toFixed(2)}</TableCell>
+                        <TableCell>{!isNaN(marketValue) ? Number(marketValue).toFixed(2) : '0.00'}</TableCell>
+                        <TableCell>{getTypeChip(asset.asset_type)}</TableCell>
+                        <TableCell>
+                            <IconButton size="small" aria-label="edit" onClick={() => handleEditClick(asset)}>
+                                <EditIcon />
+                            </IconButton>
+                            <IconButton size="small" aria-label="delete" onClick={() => handleDeleteClick(asset.id)}>
+                                <DeleteIcon sx={{ color: 'error.main' }} />
+                            </IconButton>
+                        </TableCell>
+                    </TableRow>
+                );
+             })}
            </TableBody>
          </Table>
        </TableContainer>
        <Dialog open={open} onClose={handleClose}>
          <DialogTitle>Add New Asset</DialogTitle>
          <DialogContent>
-           <TextField 
-            autoFocus 
-            margin="dense" 
-            label="Asset Name" 
-            type="text" 
-            fullWidth 
-            value={newAsset.name}
-            disabled={newAsset.asset_type === 'stocks'}
-            onChange={(e) => {
-                setNewAsset({ ...newAsset, name: e.target.value });
-                if (errors.name) setErrors({ ...errors, name: '' });
-            }}
-            error={!!errors.name}
-            helperText={errors.name}
-            />
            {newAsset.asset_type === 'stocks' || newAsset.asset_type === 'crypto' ? (
             <Autocomplete
                 options={symbolOptions}
@@ -382,19 +376,26 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
                 }}
                 onChange={(event, newValue) => {
                     if (newValue) {
-                        setNewAsset({ ...newAsset, symbol: newValue.value });
+                        setNewAsset(prev => ({ ...prev, name: newValue.name, symbol: newValue.value }));
                         handleFetchPrice(newValue.value, 'new');
                     }
                 }}
-                renderInput={(params) => <TextField {...params} label="Symbol" margin="dense" />}
+                renderInput={(params) => <TextField {...params} label="Asset Name" margin="dense" autoFocus error={!!errors.name} helperText={errors.name} />}
             />
            ) : (
             <TextField 
+                autoFocus 
                 margin="dense" 
-                label="Symbol" 
+                label="Asset Name" 
                 type="text" 
                 fullWidth 
-                onChange={(e) => setNewAsset({ ...newAsset, symbol: e.target.value })} 
+                value={newAsset.name}
+                onChange={(e) => {
+                    setNewAsset({ ...newAsset, name: e.target.value });
+                    if (errors.name) setErrors({ ...errors, name: '' });
+                }}
+                error={!!errors.name}
+                helperText={errors.name}
             />
            )}
            <Box sx={{ mt: 1 }}>
@@ -436,11 +437,11 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
            </Box>
            <Box sx={{ mt: 2 }}>
            <Select 
-            defaultValue="stocks" 
+            value={newAsset.asset_type}
             fullWidth 
             margin="dense" 
             onChange={(e) => {
-                setNewAsset({ ...newAsset, asset_type: e.target.value });
+                setNewAsset({ ...newAsset, name: '', symbol: '', asset_type: e.target.value });
                 setSymbolOptions([]);
             }}
             >
@@ -523,14 +524,21 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
             value={editingAsset?.symbol || ''}
             onChange={(e) => setEditingAsset({ ...editingAsset, symbol: e.target.value })}
           />
-          {editingAsset?.asset_type === 'stocks' && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Button onClick={() => handleFetchPrice(editingAsset.symbol, 'edit')} variant="outlined" sx={{ mt: 1 }}>Fetch Price</Button>
-            </Box>
-           )}
-          <Select
-            value={String(editingAsset?.account || '')}
-            fullWidth
+                     {editingAsset?.asset_type === 'stocks' && (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Button onClick={() => handleFetchPrice(editingAsset.symbol, 'edit')} variant="outlined" sx={{ mt: 1 }}>Fetch Price</Button>
+                      </Box>
+                     )}
+                    <TextField
+                      margin="dense"
+                      label="Market Price"
+                      type="text"
+                      fullWidth
+                      value={editingAsset?.market_price ? Number(editingAsset.market_price).toFixed(2) : ''}
+                      disabled
+                    />
+                    <Select
+                      value={String(editingAsset?.account || '')}            fullWidth
             margin="dense"
             onChange={(e) => {
                 setEditingAsset({ ...editingAsset, account: Number(e.target.value) });

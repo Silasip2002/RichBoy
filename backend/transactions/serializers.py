@@ -21,3 +21,7 @@ class AssetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Asset
         fields = '__all__'
+        read_only_fields = ('market_value', 'change')
+
+class CategorySerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=100)

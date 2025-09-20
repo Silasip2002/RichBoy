@@ -41,13 +41,31 @@ const TransactionsPage = () => {
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const { token } = useAuth();
 
+    const [search, setSearch] = useState('');
+    const [time, setTime] = useState('all');
+    const [type, setType] = useState('all');
+    const [category, setCategory] = useState('all');
+    const [account, setAccount] = useState('all');
+
+    const [categories, setCategories] = useState([]);
+    const [accounts, setAccounts] = useState([]);
+
     const handleChange = (event: React.SyntheticEvent, newValue: number) => {
         setValue(newValue);
     };
 
     const fetchTransactions = useCallback(async () => {
         if (token) {
-            const response = await fetch(`http://localhost:8000/api/transactions/?page=${page + 1}&page_size=${rowsPerPage}`, {
+            const params = new URLSearchParams({
+                page: (page + 1).toString(),
+                page_size: rowsPerPage.toString(),
+                search,
+                time,
+                type,
+                category,
+                account,
+            });
+            const response = await fetch(`http://localhost:8000/api/transactions/?${params.toString()}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                 },
@@ -58,7 +76,30 @@ const TransactionsPage = () => {
                 setCount(data.count);
             }
         }
-    }, [token, page, rowsPerPage]);
+    }, [token, page, rowsPerPage, search, time, type, category, account]);
+
+    useEffect(() => {
+        const fetchFilters = async () => {
+            if (token) {
+                const [categoriesResponse, accountsResponse] = await Promise.all([
+                    fetch('http://localhost:8000/api/categories/', { headers: { 'Authorization': `Bearer ${token}` } }),
+                    fetch('http://localhost:8000/api/accounts/', { headers: { 'Authorization': `Bearer ${token}` } })
+                ]);
+
+                if (categoriesResponse.ok) {
+                    const data = await categoriesResponse.json();
+                    setCategories(data);
+                }
+
+                if (accountsResponse.ok) {
+                    const data = await accountsResponse.json();
+                    setAccounts(data.results || []);
+                }
+            }
+        };
+
+        fetchFilters();
+    }, [token]);
 
     useEffect(() => {
         if (value === 0) {
@@ -95,6 +136,18 @@ const TransactionsPage = () => {
                             rowsPerPage={rowsPerPage}
                             onPageChange={handleChangePage}
                             onRowsPerPageChange={handleChangeRowsPerPage}
+                            search={search}
+                            setSearch={setSearch}
+                            time={time}
+                            setTime={setTime}
+                            type={type}
+                            setType={setType}
+                            category={category}
+                            setCategory={setCategory}
+                            account={account}
+                            setAccount={setAccount}
+                            categories={categories}
+                            accounts={accounts}
                         />
                     </Box>
                     <Box sx={{ width: { xs: '100%', md: '320px' }, flexShrink: 0 }}>
