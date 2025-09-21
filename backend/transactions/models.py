@@ -6,16 +6,17 @@ ACCOUNT_CHOICES = [
     ('bank', 'Bank'),
 ]
 
+CURRENCY_CHOICES = [
+    ('USD', 'USD'),
+    ('HKD', 'HKD'),
+    ('RMB', 'RMB'),
+    ('CAD', 'CAD'),
+]
+
 class Transaction(models.Model):
     TRANSACTION_TYPE_CHOICES = [
         ('income', 'Income'),
         ('expense', 'Expense'),
-    ]
-    CURRENCY_CHOICES = [
-        ('USD', 'USD'),
-        ('HKD', 'HKD'),
-        ('RMB', 'RMB'),
-        ('CAD', 'CAD'),
     ]
     CATEGORY_CHOICES = [
         ('food', 'Food'),
@@ -42,6 +43,8 @@ class Account(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='accounts')
     name = models.CharField(max_length=100)
     account_type = models.CharField(max_length=20, choices=ACCOUNT_CHOICES, default='bank')
+    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, default='USD')
 
     def __str__(self):
         return self.name
