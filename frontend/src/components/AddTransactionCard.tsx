@@ -362,7 +362,6 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
             label="Account Name"
             type="text"
             fullWidth
-            variant="standard"
             value={newAccountName}
             onChange={(e) => setNewAccountName(e.target.value)}
           />
@@ -371,7 +370,6 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
             margin="dense"
             label="Account Type"
             fullWidth
-            variant="standard"
             value={newAccountType}
             onChange={(e) => setNewAccountType(e.target.value)}
           >
@@ -384,7 +382,6 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
             label="Initial Balance"
             type="number"
             fullWidth
-            variant="standard"
             value={newAccountBalance}
             onChange={(e) => setNewAccountBalance(e.target.value)}
           />
@@ -393,7 +390,6 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
             margin="dense"
             label="Currency"
             fullWidth
-            variant="standard"
             value={newAccountCurrency}
             onChange={(e) => setNewAccountCurrency(e.target.value)}
           >

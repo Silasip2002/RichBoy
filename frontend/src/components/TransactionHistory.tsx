@@ -209,7 +209,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
                                     </TableCell>
                                     <TableCell>{transaction.description}</TableCell>
                                     <TableCell>{transaction.category}</TableCell>
-                                    <TableCell>{transaction.account}</TableCell>
+                                    <TableCell>{accounts.find(acc => acc.id === parseInt(transaction.account))?.name || transaction.account}</TableCell>
                                     <TableCell align="right">{`${transaction.amount} ${transaction.currency}`}</TableCell>
                                 </TableRow>
                             ))}

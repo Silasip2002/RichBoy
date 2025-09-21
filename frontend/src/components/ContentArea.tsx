@@ -17,7 +17,6 @@ const ContentArea: React.FC<ContentAreaProps> = ({ selectedMenuItem }) => {
     case 'Dashboard':
       content = (
         <>
-          <Typography paragraph>Welcome to your Dashboard!</Typography>
           <DashboardCard />
           <PortfolioPerformanceCard />
         </>
