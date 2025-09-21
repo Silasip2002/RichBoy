@@ -61,9 +61,6 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
   const [newAccountBalance, setNewAccountBalance] = useState('');
   const [newAccountCurrency, setNewAccountCurrency] = useState('USD');
 
-  const [openCategoryDialog, setOpenCategoryDialog] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState('');
-
   const fetchAccounts = async () => {
     if (!token) return;
     try {
@@ -188,33 +185,6 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
     }
   };
 
-  const handleOpenCategoryDialog = () => {
-    setOpenCategoryDialog(true);
-  };
-
-  const handleCloseCategoryDialog = () => {
-    setOpenCategoryDialog(false);
-    setNewCategoryName('');
-  };
-
-  const handleCreateCategory = async () => {
-    const response = await fetch('http://localhost:8000/api/categories/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({ name: newCategoryName }),
-    });
-
-    if (response.ok) {
-      handleCloseCategoryDialog();
-      // You might want to refresh the categories list here
-    } else {
-      console.error('Failed to create category');
-    }
-  };
-
   return (
     <>
       <Card sx={{
@@ -336,13 +306,6 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
               </TextField>
             </Grid>
             <Grid item xs={12} width={"100%"}>
-              <Button
-                onClick={handleOpenCategoryDialog}
-                size="small"
-                sx={{ minWidth: 0, px: 1, float: 'right' }}
-              >
-                +Add Category
-              </Button>
               <TextField
                 select
                 label="Category"
@@ -448,28 +411,8 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
           <Button onClick={handleCreateAccount}>Create</Button>
         </DialogActions>
       </Dialog>
-
-      <Dialog open={openCategoryDialog} onClose={handleCloseCategoryDialog}>
-        <DialogTitle>Add New Category</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Category Name"
-            type="text"
-            fullWidth
-            variant="standard"
-            value={newCategoryName}
-            onChange={(e) => setNewCategoryName(e.target.value)}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseCategoryDialog}>Cancel</Button>
-          <Button onClick={handleCreateCategory}>Create</Button>
-        </DialogActions>
-      </Dialog>
     </>
   );
 };
 
-export default AddTransactionCard;  
+export default AddTransactionCard;
