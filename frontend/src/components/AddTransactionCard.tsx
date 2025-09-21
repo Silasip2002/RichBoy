@@ -148,7 +148,8 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
       onTransactionAdded();
     } else {
       // Handle error
-      console.error('Failed to save transaction');
+      const errorData = await response.json();
+      console.error('Failed to save transaction:', errorData);
     }
   };
 
