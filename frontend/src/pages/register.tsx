@@ -1,14 +1,25 @@
 import React, { useState } from 'react';
-import { Box, Button, Card, CardContent, TextField, Typography } from '@mui/material';
+import {
+    Alert, Box, Button, TextField, Typography, Container, Grid, Link, Avatar
+} from '@mui/material';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { useRouter } from 'next/router';
 
 const RegisterPage: React.FC = () => {
     const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [error, setError] = useState<string | null>(null);
     const router = useRouter();
 
-    const handleRegister = async () => {
+    const handleRegister = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (password !== confirmPassword) {
+            setError('Passwords do not match');
+            return;
+        }
+
         const response = await fetch('http://localhost:8000/api/users/register/', {
             method: 'POST',
             headers: {
@@ -20,54 +31,108 @@ const RegisterPage: React.FC = () => {
         if (response.ok) {
             router.push('/login');
         } else {
-            // Handle error
-            console.error('Registration failed');
+            const errorData = await response.json();
+            const errorMessage = Object.values(errorData).flat().join(' ');
+            setError(errorMessage);
+            console.error('Registration failed:', errorData);
         }
     };
 
     return (
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-            <Card sx={{ minWidth: 275 }}>
-                <CardContent>
-                    <Typography variant="h5" gutterBottom>
-                        Register
-                    </Typography>
-                    <TextField
-                        label="Username"
-                        variant="outlined"
+        <Container component="main" maxWidth="xs">
+            <Box
+                sx={{
+                    marginTop: 8,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                }}
+            >
+                <Avatar sx={{ m: 1, bgcolor: 'secondary.main' }}>
+                    <LockOutlinedIcon />
+                </Avatar>
+                <Typography component="h1" variant="h5">
+                    Sign up
+                </Typography>
+                <Box component="form" onSubmit={handleRegister} noValidate sx={{ mt: 3 }}>
+                    <Grid container spacing={2}>
+                        <Grid item xs={12} width={"100%"}>
+                            <TextField
+                                required
+                                fullWidth
+                                id="username"
+                                label="Username"
+                                name="username"
+                                autoComplete="username"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                            />
+                        </Grid>
+                        <Grid item xs={12} width={"100%"}>
+                            <TextField
+                                required
+                                fullWidth
+                                id="email"
+                                label="Email Address"
+                                name="email"
+                                autoComplete="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                            />
+                        </Grid>
+                        <Grid item xs={12} width={"100%"}>
+                            <TextField
+                                required
+                                fullWidth
+                                name="password"
+                                label="Password"
+                                type="password"
+                                id="password"
+                                autoComplete="new-password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                            />
+                        </Grid>
+                        <Grid item xs={12} width={"100%"}>
+                            <TextField
+                                required
+                                fullWidth
+                                name="confirmPassword"
+                                label="Confirm Password"
+                                type="password"
+                                id="confirmPassword"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                            />
+                        </Grid>
+                    </Grid>
+                    {error && <Alert severity="error" sx={{ mt: 2, width: '100%' }}>{error}</Alert>}
+                    <Button
+                        type="submit"
                         fullWidth
-                        sx={{ mb: 2 }}
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                    />
-                    <TextField
-                        label="Email"
-                        variant="outlined"
-                        fullWidth
-                        sx={{ mb: 2 }}
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                    />
-                    <TextField
-                        label="Password"
-                        variant="outlined"
-                        fullWidth
-                        sx={{ mb: 2 }}
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                    />
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-start', gap: '1rem', alignItems: 'center' }}>
-                        <Button variant="contained" color="primary" onClick={handleRegister}>
-                            Register
-                        </Button>
-                        <Button variant="text" onClick={() => router.push('/login')}>
-                            Back to login
-                        </Button>
-                    </Box>
-                </CardContent>
-            </Card>
-        </Box>
+                        variant="contained"
+                        sx={{ mt: 3, mb: 2 }}
+                    >
+                        Sign Up
+                    </Button>
+                    <Grid container justifyContent="flex-end">
+                        <Grid item>
+                            <Link href="/login" variant="body2" onClick={(e) => { e.preventDefault(); router.push('/login'); }}>
+                                Already have an account? Sign in
+                            </Link>
+                        </Grid>
+                    </Grid>
+                </Box>
+            </Box>
+            <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 5 }}>
+                {'Copyright © '}
+                <Link color="inherit" href="#">
+                    RichBoy
+                </Link>{' '}
+                {new Date().getFullYear()}
+                {'.'}
+            </Typography>
+        </Container>
     );
 };
 
