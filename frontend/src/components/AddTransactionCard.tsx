@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Box,
@@ -38,6 +38,11 @@ interface AddTransactionCardProps {
   onTransactionAdded: () => void;
 }
 
+interface Account {
+  id: number;
+  name: string;
+}
+
 const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAdded }) => {
   const [transactionType, setTransactionType] = useState('expense');
   const [amount, setAmount] = useState('');
@@ -47,6 +52,7 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [isRecurring, setIsRecurring] = useState(false);
   const [account, setAccount] = useState('');
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const { token } = useAuth();
 
   const [openAccountDialog, setOpenAccountDialog] = useState(false);
@@ -57,6 +63,36 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
 
   const [openCategoryDialog, setOpenCategoryDialog] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+
+  const fetchAccounts = async () => {
+    if (!token) return;
+    try {
+      const response = await fetch('http://localhost:8000/api/accounts/', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data && Array.isArray(data.results)) {
+          setAccounts(data.results);
+        } else if (Array.isArray(data)) {
+          setAccounts(data);
+        } else {
+          console.error('Received data is not an array or paginated response');
+          setAccounts([]); // Ensure accounts is always an array
+        }
+      } else {
+        console.error('Failed to fetch accounts');
+      }
+    } catch (error) {
+      console.error('Error fetching accounts:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchAccounts();
+  }, [token]);
 
   const handleTransactionTypeChange = (event: React.MouseEvent<HTMLElement>, newType: string) => {
     if (newType !== null) {
@@ -122,7 +158,7 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
 
     if (response.ok) {
       handleCloseAccountDialog();
-      // You might want to refresh the accounts list here
+      fetchAccounts();
     } else {
       console.error('Failed to create account');
     }
@@ -268,9 +304,11 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
                 fullWidth
               >
                 <MenuItem value="" disabled>Select an account</MenuItem>
-                <MenuItem value="cash">Cash</MenuItem>
-                <MenuItem value="bank">Bank Account</MenuItem>
-                <MenuItem value="credit_card">Credit Card</MenuItem>
+                {accounts.map((acc) => (
+                  <MenuItem key={acc.id} value={acc.id}>
+                    {acc.name}
+                  </MenuItem>
+                ))}
               </TextField>
             </Grid>
             <Grid item xs={12} width={"100%"}>
