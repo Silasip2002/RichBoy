@@ -94,9 +94,32 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
     fetchAccounts();
   }, [token]);
 
+  const expenseCategories = [
+    { value: 'food', label: 'Food' },
+    { value: 'housing', label: 'Housing' },
+    { value: 'transportation', label: 'Transportation' },
+    { value: 'entertainment', label: 'Entertainment' },
+    { value: 'shopping', label: 'Shopping' },
+    { value: 'utilities', label: 'Utilities' },
+    { value: 'healthcare', label: 'Healthcare' },
+    { value: 'education', label: 'Education' },
+    { value: 'other_expense', label: 'Other Expense' },
+  ];
+
+  const incomeCategories = [
+    { value: 'salary', label: 'Salary' },
+    { value: 'investments', label: 'Investments' },
+    { value: 'freelance', label: 'Freelance' },
+    { value: 'gifts', label: 'Gifts' },
+    { value: 'other_income', label: 'Other Income' },
+  ];
+
+  const currentCategories = transactionType === 'income' ? incomeCategories : expenseCategories;
+
   const handleTransactionTypeChange = (event: React.MouseEvent<HTMLElement>, newType: string) => {
     if (newType !== null) {
       setTransactionType(newType);
+      setCategory(''); // Reset category when transaction type changes
     }
   };
 
@@ -327,11 +350,11 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
                 fullWidth
               >
                 <MenuItem value="" disabled>Select a category</MenuItem>
-                <MenuItem value="Salary">Salary</MenuItem>
-                <MenuItem value="Investments">Investments</MenuItem>
-                <MenuItem value="Freelance">Freelance</MenuItem>
-                <MenuItem value="Gifts">Gifts</MenuItem>
-                <MenuItem value="Other Income">Other Income</MenuItem>
+                {currentCategories.map((cat) => (
+                  <MenuItem key={cat.value} value={cat.value}>
+                    {cat.label}
+                  </MenuItem>
+                ))}
               </TextField>
             </Grid>
             <Grid item xs={12} width={"100%"}>

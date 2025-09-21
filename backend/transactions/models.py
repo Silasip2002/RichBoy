@@ -20,10 +20,14 @@ class Transaction(models.Model):
     ]
     CATEGORY_CHOICES = [
         ('food', 'Food'),
+        ('housing', 'Housing'),
         ('transportation', 'Transportation'),
-        ('salary', 'Salary'),
+        ('entertainment', 'Entertainment'),
+        ('shopping', 'Shopping'),
         ('utilities', 'Utilities'),
-        ('other', 'Other'),
+        ('healthcare', 'Healthcare'),
+        ('education', 'Education'),
+        ('other_expense', 'Other Expense'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='transactions')
