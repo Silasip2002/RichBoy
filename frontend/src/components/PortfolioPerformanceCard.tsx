@@ -90,7 +90,7 @@ const PortfolioPerformanceCard: React.FC = () => {
         <Divider sx={{ my: 2 }} />
 
         <Typography variant="h6" component="div" sx={{ mb: 1 }}>
-          Individual Asset Performance
+          Asset Performance
         </Typography>
         <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <LineChart

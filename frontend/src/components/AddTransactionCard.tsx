@@ -34,6 +34,7 @@ import {
   CalendarTodayOutlined,
 } from '@mui/icons-material';
 import constants from '../data/constants.json';
+import { createTransaction, getAccounts, createAccount } from '../services/api';
 
 interface AddTransactionCardProps {
   onTransactionAdded: () => void;
@@ -65,23 +66,14 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
   const fetchAccounts = async () => {
     if (!token) return;
     try {
-      const response = await fetch('http://localhost:8000/api/accounts/', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data && Array.isArray(data.results)) {
-          setAccounts(data.results);
-        } else if (Array.isArray(data)) {
-          setAccounts(data);
-        } else {
-          console.error('Received data is not an array or paginated response');
-          setAccounts([]); // Ensure accounts is always an array
-        }
+      const data = await getAccounts(token);
+      if (data && Array.isArray(data.results)) {
+        setAccounts(data.results);
+      } else if (Array.isArray(data)) {
+        setAccounts(data);
       } else {
-        console.error('Failed to fetch accounts');
+        console.error('Received data is not an array or paginated response');
+        setAccounts([]); // Ensure accounts is always an array
       }
     } catch (error) {
       console.error('Error fetching accounts:', error);
@@ -102,13 +94,9 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
   };
 
   const handleSaveTransaction = async () => {
-    const response = await fetch('http://localhost:8000/api/transactions/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({
+    if (!token) return;
+    try {
+      await createTransaction(token, {
         transaction_type: transactionType,
         amount,
         currency,
@@ -117,17 +105,11 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
         date,
         is_recurring: isRecurring,
         account,
-      }),
-    });
-
-    if (response.ok) {
-      // Handle success
+      });
       console.log('Transaction saved');
       onTransactionAdded();
-    } else {
-      // Handle error
-      const errorData = await response.json();
-      console.error('Failed to save transaction:', errorData);
+    } catch (error) {
+      console.error('Failed to save transaction:', error);
     }
   };
 
@@ -144,25 +126,18 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
   };
 
   const handleCreateAccount = async () => {
-    const response = await fetch('http://localhost:8000/api/accounts/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({
+    if (!token) return;
+    try {
+      await createAccount(token, {
         name: newAccountName,
         account_type: newAccountType,
         balance: newAccountBalance,
         currency: newAccountCurrency,
-      }),
-    });
-
-    if (response.ok) {
+      });
       handleCloseAccountDialog();
       fetchAccounts();
-    } else {
-      console.error('Failed to create account');
+    } catch (error) {
+      console.error('Failed to create account:', error);
     }
   };
 

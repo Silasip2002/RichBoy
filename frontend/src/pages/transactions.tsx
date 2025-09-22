@@ -6,6 +6,7 @@ import Reports from '../components/Reports';
 import Accounts from '../components/Accounts';
 import Budgets from '../components/Budgets';
 import { useAuth } from '../contexts/AuthContext';
+import { getTransactions, getAccounts } from '../services/api';
 
 interface TabPanelProps {
     children?: React.ReactNode;
@@ -64,15 +65,12 @@ const TransactionsPage = () => {
                 category,
                 account,
             });
-            const response = await fetch(`http://localhost:8000/api/transactions/?${params.toString()}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                },
-            });
-            if (response.ok) {
-                const data = await response.json();
+            try {
+                const data = await getTransactions(token, params);
                 setTransactions(data.results);
                 setCount(data.count);
+            } catch (error) {
+                console.error('Failed to fetch transactions:', error);
             }
         }
     }, [token, page, rowsPerPage, search, time, type, category, account]);
@@ -80,13 +78,11 @@ const TransactionsPage = () => {
     useEffect(() => {
         const fetchFilters = async () => {
             if (token) {
-                const [accountsResponse] = await Promise.all([
-                    fetch('http://localhost:8000/api/accounts/', { headers: { 'Authorization': `Bearer ${token}` } })
-                ]);
-
-                if (accountsResponse.ok) {
-                    const data = await accountsResponse.json();
+                try {
+                    const data = await getAccounts(token);
                     setAccounts(data.results || []);
+                } catch (error) {
+                    console.error('Failed to fetch accounts:', error);
                 }
             }
         };

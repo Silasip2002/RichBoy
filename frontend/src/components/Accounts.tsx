@@ -12,6 +12,7 @@ import {
     CreditCard as CreditCardIcon,
 } from '@mui/icons-material';
 import constants from '../data/constants.json';
+import { getAccounts, createAccount } from '../services/api';
 
 interface Account {
     id: number;
@@ -39,29 +40,18 @@ const Accounts: React.FC = () => {
         setLoading(true);
         setError(null);
         try {
-            const response = await fetch('http://localhost:8000/api/accounts/', {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                },
-            });
-            if (response.ok) {
-                const data = await response.json();
-                // Assuming data is an array of accounts or has a .results property
-                if (Array.isArray(data.results)) {
-                    setAccounts(data.results.map((acc: any) => ({ ...acc, balance: parseFloat(acc.balance) })));
-                } else if (Array.isArray(data)) {
-                    setAccounts(data.map((acc: any) => ({ ...acc, balance: parseFloat(acc.balance) })));
-                } else {
-                    console.error('Received data is not an array or paginated response', data);
-                    setAccounts([]);
-                }
+            const data = await getAccounts(token);
+            if (Array.isArray(data.results)) {
+                setAccounts(data.results.map((acc: any) => ({ ...acc, balance: parseFloat(acc.balance) })));
+            } else if (Array.isArray(data)) {
+                setAccounts(data.map((acc: any) => ({ ...acc, balance: parseFloat(acc.balance) })));
             } else {
-                const errorData = await response.json();
-                setError(errorData.detail || 'Failed to fetch accounts');
+                console.error('Received data is not an array or paginated response', data);
+                setAccounts([]);
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error('Error fetching accounts:', err);
-            setError('Network error or server is unreachable');
+            setError(err.message || 'Network error or server is unreachable');
         } finally {
             setLoading(false);
         }
@@ -89,31 +79,17 @@ const Accounts: React.FC = () => {
         if (!token) return;
         setAddAccountError(null);
         try {
-            const response = await fetch('http://localhost:8000/api/accounts/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                    name: newAccountName,
-                    account_type: newAccountType,
-                    balance: parseFloat(newAccountBalance),
-                    currency: newAccountCurrency,
-                }),
+            await createAccount(token, {
+                name: newAccountName,
+                account_type: newAccountType,
+                balance: parseFloat(newAccountBalance),
+                currency: newAccountCurrency,
             });
-
-            if (response.ok) {
-                handleCloseAddAccountDialog();
-                fetchAccounts(); // Refresh accounts list
-            } else {
-                const errorData = await response.json();
-                const errorMessage = Object.values(errorData).flat().join(' ');
-                setAddAccountError(errorMessage || 'Failed to create account');
-            }
-        } catch (err) {
+            handleCloseAddAccountDialog();
+            fetchAccounts(); // Refresh accounts list
+        } catch (err: any) {
+            setAddAccountError(err.message || 'Failed to create account');
             console.error('Error creating account:', err);
-            setAddAccountError('Network error or server is unreachable');
         }
     };
 
