@@ -7,8 +7,6 @@ import { useAuth } from '../contexts/AuthContext';
 const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetStateAction<any[]>>, accounts: any[], setAccounts: React.Dispatch<React.SetStateAction<any[]>>, loading: boolean }> = ({ assets, setAssets, accounts, setAccounts, loading }) => {
   const { token } = useAuth();
   const [open, setOpen] = React.useState(false);
-  const [addAccountOpen, setAddAccountOpen] = React.useState(false);
-  const [newAccountName, setNewAccountName] = React.useState('');
   const [newAsset, setNewAsset] = React.useState<{
     name: string;
     symbol: string;
@@ -169,30 +167,6 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
         }
     } catch (error) {
         console.error('Failed to add asset', error);
-    }
-  };
-
-  const handleCreateAccount = async () => {
-    try {
-        const response = await fetch('http://localhost:8000/api/accounts/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
-            },
-            body: JSON.stringify({ name: newAccountName }),
-        });
-        if (response.ok) {
-            const data = await response.json();
-            setAccounts([...accounts, data]);
-            setNewAsset({ ...newAsset, account: data.id });
-            setNewAccountName('');
-            setAddAccountOpen(false);
-        } else {
-            console.error('Failed to create account');
-        }
-    } catch (error) {
-        console.error('Failed to create account', error);
     }
   };
 
@@ -404,12 +378,8 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
             fullWidth
             margin="dense"
             onChange={(e) => {
-                if (e.target.value === 'create-new') {
-                    setAddAccountOpen(true);
-                } else {
-                    setNewAsset({ ...newAsset, account: Number(e.target.value) });
-                    if (errors.account) setErrors({ ...errors, account: '' });
-                }
+              setNewAsset({ ...newAsset, account: Number(e.target.value) });
+              if (errors.account) setErrors({ ...errors, account: '' });
             }}
             displayEmpty
             error={!!errors.account}
@@ -422,16 +392,6 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
                     {account.name}
                 </MenuItem>
             ))}
-            <MenuItem value="create-new" sx={{ 
-                backgroundColor: 'primary.main', 
-                color: 'white', 
-                '&:hover': {
-                    backgroundColor: 'primary.dark',
-                },
-                m: 1,
-                borderRadius: 1,
-                textAlign: 'center'
-            }}>Create New Account</MenuItem>
            </Select>
            {errors.account && <Typography color="error" variant="caption">{errors.account}</Typography>}
            </Box>
@@ -479,24 +439,6 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
          <DialogActions>
            <Button onClick={handleClose}>Cancel</Button>
            <Button onClick={handleAddAsset}>Add</Button>
-         </DialogActions>
-       </Dialog>
-       <Dialog open={addAccountOpen} onClose={() => setAddAccountOpen(false)}>
-         <DialogTitle>Create New Account</DialogTitle>
-         <DialogContent>
-           <TextField
-             autoFocus
-             margin="dense"
-             label="Account Name"
-             type="text"
-             fullWidth
-             value={newAccountName}
-             onChange={(e) => setNewAccountName(e.target.value)}
-           />
-         </DialogContent>
-         <DialogActions>
-           <Button onClick={() => setAddAccountOpen(false)}>Cancel</Button>
-           <Button onClick={handleCreateAccount}>Create</Button>
          </DialogActions>
        </Dialog>
        <Dialog open={editAssetOpen} onClose={() => {setEditAssetOpen(false); setErrors({});}}>
