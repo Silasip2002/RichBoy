@@ -4,6 +4,10 @@ from django.contrib.auth.models import User
 ACCOUNT_CHOICES = [
     ('cash', 'Cash'),
     ('bank', 'Bank'),
+    ('credit_card', 'Credit Card'),
+    ('investment', 'Investment'),
+    ('loan', 'Loan'),
+    ('other', 'Other'),
 ]
 
 CURRENCY_CHOICES = [
