@@ -18,6 +18,7 @@ import {
     Select,
     MenuItem,
 } from '@mui/material';
+import constants from '../data/constants.json';
 
 interface Transaction {
     id: number;
@@ -47,7 +48,6 @@ interface TransactionHistoryProps {
     setCategory: (category: string) => void;
     account: string;
     setAccount: (account: string) => void;
-    categories: { id: number; name: string }[];
     accounts: { id: number; name: string }[];
 }
 
@@ -68,7 +68,6 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
     setCategory,
     account,
     setAccount,
-    categories,
     accounts,
 }) => {
     const [totalIncome, setTotalIncome] = useState(0);
@@ -122,6 +121,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
         fetchAllTransactions();
     }, [token]);
 
+    const allCategories = [...constants.transactionCategories.income, ...constants.transactionCategories.expense];
 
     return (
         <Card sx={{ width: '100%' }}>
@@ -158,8 +158,8 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
                         <InputLabel>Category</InputLabel>
                         <Select value={category} onChange={(e) => setCategory(e.target.value)}>
                             <MenuItem value="all">All</MenuItem>
-                            {categories.map((cat) => (
-                                <MenuItem key={cat.name} value={cat.name}>{cat.name}</MenuItem>
+                            {allCategories.map((cat) => (
+                                <MenuItem key={cat.value} value={cat.value}>{cat.label}</MenuItem>
                             ))}
                         </Select>
                     </FormControl>

@@ -1,0 +1,40 @@
+{
+  "accountTypes": [
+    { "value": "bank", "label": "Bank Account" },
+    { "value": "cash", "label": "Cash Account" },
+    { "value": "credit_card", "label": "Credit Card" },
+    { "value": "investment", "label": "Investment Account" },
+    { "value": "loan", "label": "Loan" },
+    { "value": "other", "label": "Other" }
+  ],
+  "currencies": [
+    { "value": "USD", "label": "USD - United States Dollar" },
+    { "value": "EUR", "label": "EUR - Euro" },
+    { "value": "JPY", "label": "JPY - Japanese Yen" },
+    { "value": "GBP", "label": "GBP - British Pound Sterling" },
+    { "value": "AUD", "label": "AUD - Australian Dollar" },
+    { "value": "CAD", "label": "CAD - Canadian Dollar" },
+    { "value": "CHF", "label": "CHF - Swiss Franc" },
+    { "value": "CNY", "label": "CNY - Chinese Yuan" },
+    { "value": "SEK", "label": "SEK - Swedish Krona" },
+    { "value": "NZD", "label": "NZD - New Zealand Dollar" }
+  ],
+  "transactionCategories": {
+    "income": [
+      { "value": "salary", "label": "Salary" },
+      { "value": "freelance", "label": "Freelance" },
+      { "value": "investment", "label": "Investment" },
+      { "value": "other", "label": "Other" }
+    ],
+    "expense": [
+      { "value": "food", "label": "Food" },
+      { "value": "transportation", "label": "Transportation" },
+      { "value": "housing", "label": "Housing" },
+      { "value": "utilities", "label": "Utilities" },
+      { "value": "entertainment", "label": "Entertainment" },
+      { "value": "health", "label": "Health" },
+      { "value": "education", "label": "Education" },
+      { "value": "other", "label": "Other" }
+    ]
+  }
+}

@@ -33,6 +33,7 @@ import {
   LocalOfferOutlined,
   CalendarTodayOutlined,
 } from '@mui/icons-material';
+import constants from '../data/constants.json';
 
 interface AddTransactionCardProps {
   onTransactionAdded: () => void;
@@ -46,7 +47,7 @@ interface Account {
 const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAdded }) => {
   const [transactionType, setTransactionType] = useState('expense');
   const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState('USD');
+  const [currency, setCurrency] = useState(constants.currencies[0].value);
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -57,9 +58,9 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
 
   const [openAccountDialog, setOpenAccountDialog] = useState(false);
   const [newAccountName, setNewAccountName] = useState('');
-  const [newAccountType, setNewAccountType] = useState('');
+  const [newAccountType, setNewAccountType] = useState(constants.accountTypes[0].value);
   const [newAccountBalance, setNewAccountBalance] = useState('');
-  const [newAccountCurrency, setNewAccountCurrency] = useState('USD');
+  const [newAccountCurrency, setNewAccountCurrency] = useState(constants.currencies[0].value);
 
   const fetchAccounts = async () => {
     if (!token) return;
@@ -91,27 +92,7 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
     fetchAccounts();
   }, [token]);
 
-  const expenseCategories = [
-    { value: 'food', label: 'Food' },
-    { value: 'housing', label: 'Housing' },
-    { value: 'transportation', label: 'Transportation' },
-    { value: 'entertainment', label: 'Entertainment' },
-    { value: 'shopping', label: 'Shopping' },
-    { value: 'utilities', label: 'Utilities' },
-    { value: 'healthcare', label: 'Healthcare' },
-    { value: 'education', label: 'Education' },
-    { value: 'other_expense', label: 'Other Expense' },
-  ];
-
-  const incomeCategories = [
-    { value: 'salary', label: 'Salary' },
-    { value: 'investments', label: 'Investments' },
-    { value: 'freelance', label: 'Freelance' },
-    { value: 'gifts', label: 'Gifts' },
-    { value: 'other_income', label: 'Other Income' },
-  ];
-
-  const currentCategories = transactionType === 'income' ? incomeCategories : expenseCategories;
+  const currentCategories = transactionType === 'income' ? constants.transactionCategories.income : constants.transactionCategories.expense;
 
   const handleTransactionTypeChange = (event: React.MouseEvent<HTMLElement>, newType: string) => {
     if (newType !== null) {
@@ -157,9 +138,9 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
   const handleCloseAccountDialog = () => {
     setOpenAccountDialog(false);
     setNewAccountName('');
-    setNewAccountType('');
+    setNewAccountType(constants.accountTypes[0].value);
     setNewAccountBalance('');
-    setNewAccountCurrency('USD');
+    setNewAccountCurrency(constants.currencies[0].value);
   };
 
   const handleCreateAccount = async () => {
@@ -260,13 +241,11 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
                 onChange={(e) => setCurrency(e.target.value)}
                 fullWidth
               >
-                <MenuItem value="USD">USD</MenuItem>
-                <MenuItem value="EUR">EUR</MenuItem>
-                <MenuItem value="GBP">GBP</MenuItem>
-                <MenuItem value="JPY">JPY</MenuItem>
-                <MenuItem value="CNY">CNY</MenuItem>
-                <MenuItem value="HKD">HKD</MenuItem>
-                <MenuItem value="TWD">TWD</MenuItem>
+                {constants.currencies.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
               </TextField>
             </Grid>
             <Grid item xs={12} width={"100%"}>
@@ -373,9 +352,11 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
             value={newAccountType}
             onChange={(e) => setNewAccountType(e.target.value)}
           >
-            <MenuItem value="cash">Cash</MenuItem>
-            <MenuItem value="bank">Bank Account</MenuItem>
-            <MenuItem value="credit_card">Credit Card</MenuItem>
+            {constants.accountTypes.map((option) => (
+              <MenuItem key={option.value} value={option.value}>
+                {option.label}
+              </MenuItem>
+            ))}
           </TextField>
           <TextField
             margin="dense"
@@ -393,13 +374,11 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
             value={newAccountCurrency}
             onChange={(e) => setNewAccountCurrency(e.target.value)}
           >
-            <MenuItem value="USD">USD</MenuItem>
-            <MenuItem value="EUR">EUR</MenuItem>
-            <MenuItem value="GBP">GBP</MenuItem>
-            <MenuItem value="JPY">JPY</MenuItem>
-            <MenuItem value="CNY">CNY</MenuItem>
-            <MenuItem value="HKD">HKD</MenuItem>
-            <MenuItem value="TWD">TWD</MenuItem>
+            {constants.currencies.map((option) => (
+              <MenuItem key={option.value} value={option.value}>
+                {option.label}
+              </MenuItem>
+            ))}
           </TextField>
         </DialogContent>
         <DialogActions>

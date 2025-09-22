@@ -11,6 +11,7 @@ import {
     AccountBalanceWalletOutlined as AccountBalanceWalletOutlinedIcon,
     CreditCard as CreditCardIcon,
 } from '@mui/icons-material';
+import constants from '../data/constants.json';
 
 interface Account {
     id: number;
@@ -28,9 +29,9 @@ const Accounts: React.FC = () => {
 
     const [openAddAccountDialog, setOpenAddAccountDialog] = useState(false);
     const [newAccountName, setNewAccountName] = useState('');
-    const [newAccountType, setNewAccountType] = useState('bank');
+    const [newAccountType, setNewAccountType] = useState(constants.accountTypes[0].value);
     const [newAccountBalance, setNewAccountBalance] = useState('');
-    const [newAccountCurrency, setNewAccountCurrency] = useState('USD');
+    const [newAccountCurrency, setNewAccountCurrency] = useState(constants.currencies[0].value);
     const [addAccountError, setAddAccountError] = useState<string | null>(null);
 
     const fetchAccounts = async () => {
@@ -78,9 +79,9 @@ const Accounts: React.FC = () => {
     const handleCloseAddAccountDialog = () => {
         setOpenAddAccountDialog(false);
         setNewAccountName('');
-        setNewAccountType('bank');
+        setNewAccountType(constants.accountTypes[0].value);
         setNewAccountBalance('');
-        setNewAccountCurrency('USD');
+        setNewAccountCurrency(constants.currencies[0].value);
         setAddAccountError(null);
     };
 
@@ -192,11 +193,7 @@ const Accounts: React.FC = () => {
                                             {account.currency} {account.balance.toFixed(2)}
                                         </Typography>
                                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                            {account.account_type === 'cash'
-                                                ? 'Cash Account'
-                                                : account.account_type === 'bank'
-                                                    ? 'Bank Account'
-                                                    : 'Credit Card'}
+                                            {constants.accountTypes.find(at => at.value === account.account_type)?.label || account.account_type}
                                         </Typography>
                                     </Card>
                                 </Grid>
@@ -230,9 +227,11 @@ const Accounts: React.FC = () => {
                         onChange={(e) => setNewAccountType(e.target.value)}
                         sx={{ mb: 2 }}
                     >
-                        <MenuItem value="cash">Cash</MenuItem>
-                        <MenuItem value="bank">Bank Account</MenuItem>
-                        <MenuItem value="credit_card">Credit Card</MenuItem>
+                        {constants.accountTypes.map((option) => (
+                            <MenuItem key={option.value} value={option.value}>
+                                {option.label}
+                            </MenuItem>
+                        ))}
                     </TextField>
                     <TextField
                         margin="dense"
@@ -252,13 +251,11 @@ const Accounts: React.FC = () => {
                         onChange={(e) => setNewAccountCurrency(e.target.value)}
                         sx={{ mb: 2 }}
                     >
-                        <MenuItem value="USD">USD</MenuItem>
-                        <MenuItem value="EUR">EUR</MenuItem>
-                        <MenuItem value="GBP">GBP</MenuItem>
-                        <MenuItem value="JPY">JPY</MenuItem>
-                        <MenuItem value="CNY">CNY</MenuItem>
-                        <MenuItem value="HKD">HKD</MenuItem>
-                        <MenuItem value="TWD">TWD</MenuItem>
+                        {constants.currencies.map((option) => (
+                            <MenuItem key={option.value} value={option.value}>
+                                {option.label}
+                            </MenuItem>
+                        ))}
                     </TextField>
                 </DialogContent>
                 <DialogActions>

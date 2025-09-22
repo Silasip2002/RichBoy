@@ -47,7 +47,6 @@ const TransactionsPage = () => {
     const [category, setCategory] = useState('all');
     const [account, setAccount] = useState('all');
 
-    const [categories, setCategories] = useState([]);
     const [accounts, setAccounts] = useState([]);
 
     const handleChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -81,15 +80,9 @@ const TransactionsPage = () => {
     useEffect(() => {
         const fetchFilters = async () => {
             if (token) {
-                const [categoriesResponse, accountsResponse] = await Promise.all([
-                    fetch('http://localhost:8000/api/categories/', { headers: { 'Authorization': `Bearer ${token}` } }),
+                const [accountsResponse] = await Promise.all([
                     fetch('http://localhost:8000/api/accounts/', { headers: { 'Authorization': `Bearer ${token}` } })
                 ]);
-
-                if (categoriesResponse.ok) {
-                    const data = await categoriesResponse.json();
-                    setCategories(data);
-                }
 
                 if (accountsResponse.ok) {
                     const data = await accountsResponse.json();
@@ -146,7 +139,6 @@ const TransactionsPage = () => {
                             setCategory={setCategory}
                             account={account}
                             setAccount={setAccount}
-                            categories={categories}
                             accounts={accounts}
                         />
                     </Box>
