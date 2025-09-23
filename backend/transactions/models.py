@@ -65,7 +65,7 @@ class Asset(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='assets')
     account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='assets')
     name = models.CharField(max_length=100)
-    symbol = models.CharField(max_length=10, blank=True, null=True)
+    symbol = models.CharField(max_length=30, blank=True, null=True)
     asset_type = models.CharField(max_length=20, choices=ASSET_TYPE_CHOICES)
     price = models.DecimalField(max_digits=10, decimal_places=2, help_text="Cost per unit at time of purchase")
     quantity = models.DecimalField(max_digits=10, decimal_places=4)

@@ -3,6 +3,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 import requests
 import logging
+import time
 from django.conf import settings
 from .models import Transaction, Account, Asset
 from .serializers import TransactionSerializer, AccountSerializer, AssetSerializer, CategorySerializer
@@ -93,52 +94,62 @@ class AssetViewSet(viewsets.ModelViewSet):
 @permission_classes([permissions.IsAuthenticated])
 def get_stock_price(request):
     symbol = request.query_params.get('symbol', None)
+    asset_type = request.query_params.get('type', 'stocks')
     if not symbol:
         return Response({'error': 'Symbol parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-    api_key = settings.ALPHA_VANTAGE_API_KEY
+    api_key = settings.FINNHUB_API_KEY
+    base_url = settings.FINNHUB_API_URL
     
-    # Fetch Price
-    price_url = f'https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey={api_key}'
-    
-    # Fetch Name
-    search_url = f'https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords={symbol}&apikey={api_key}'
-
     try:
-        price_response = requests.get(price_url)
-        price_data = price_response.json()
-        logger.error(f"Alpha Vantage Price Response for {symbol}: {price_data}")
+        if asset_type == 'crypto':
+            # It's a crypto symbol
+            end_time = int(time.time())
+            start_time = end_time - 86400 * 2 # 2 days ago to make sure we get a candle
 
-        if "Note" in price_data:
-            return Response({'error': 'Alpha Vantage API rate limit exceeded.'}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+            url = f'{base_url}/crypto/candle?symbol={symbol}&resolution=D&from={start_time}&to={end_time}&token={api_key}'
+            response = requests.get(url)
+            response.raise_for_status()
+            data = response.json()
 
-        search_response = requests.get(search_url)
-        search_data = search_response.json()
-        logger.error(f"Alpha Vantage Search Response for {symbol}: {search_data}")
+            if data.get('s') == 'ok' and data.get('c') and data['c']:
+                price = data['c'][-1] # last closing price
+                # Construct name from symbol
+                _, pair = symbol.split(':')
+                name = pair.replace('USDT', '/USD') 
+                return Response({'price': price, 'name': name})
+            else:
+                logger.error(f"Finnhub crypto response for {symbol}: {data}")
+                return Response({'error': 'Could not fetch data for the given crypto symbol'}, status=status.HTTP_404_NOT_FOUND)
 
+        else: # It's a stock symbol
+            # Fetch Price
+            price_url = f'{base_url}/quote?symbol={symbol}&token={api_key}'
+            price_response = requests.get(price_url)
+            price_response.raise_for_status()
+            price_data = price_response.json()
 
-        price = None
-        name = None
+            # Fetch Name/Profile
+            profile_url = f'{base_url}/stock/profile2?symbol={symbol}&token={api_key}'
+            profile_response = requests.get(profile_url)
+            profile_response.raise_for_status()
+            profile_data = profile_response.json()
 
-        if 'Global Quote' in price_data and '05. price' in price_data['Global Quote']:
-            price = price_data['Global Quote']['05. price']
-        
-        if 'bestMatches' in search_data and len(search_data['bestMatches']) > 0:
-            # Find the best match for the symbol
-            best_match = next((match for match in search_data['bestMatches'] if match['1. symbol'].upper() == symbol.upper()), None)
-            if best_match:
-                name = best_match['2. name']
+            price = price_data.get('c')
+            name = profile_data.get('name')
 
-        if price is not None and name is not None:
-            return Response({'price': price, 'name': name})
-        elif price is not None:
-            return Response({'price': price, 'name': ''}) # Return price even if name not found
-        else:
-            return Response({'error': 'Could not fetch data for the given symbol'}, status=status.HTTP_404_NOT_FOUND)
-            
+            if price is not None and price != 0:
+                return Response({'price': price, 'name': name if name else ''})
+            else:
+                logger.error(f"Finnhub stock response for {symbol}: price_data={price_data}, profile_data={profile_data}")
+                return Response({'error': 'Could not fetch data for the given stock symbol'}, status=status.HTTP_404_NOT_FOUND)
+
     except requests.exceptions.RequestException as e:
         logger.error(f"Request failed for {symbol}: {e}")
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except Exception as e:
+        logger.error(f"An error occurred while fetching price for {symbol}: {e}")
+        return Response({'error': 'An unexpected error occurred.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
@@ -149,31 +160,23 @@ def search_symbols(request):
     if not keywords:
         return Response({'error': 'Keywords parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-    api_key = settings.ALPHA_VANTAGE_API_KEY
+    api_key = settings.FINNHUB_API_KEY
+    base_url = settings.FINNHUB_API_URL
 
     if asset_type == 'crypto':
-        url = 'https://www.alphavantage.co/digital_currency_list/'
+        # For crypto, we'll search symbols from a major exchange like Binance
+        exchange = 'binance'
+        url = f'{base_url}/crypto/symbol?exchange={exchange}&token={api_key}'
         try:
             response = requests.get(url)
             response.raise_for_status()
-            
-            import csv
-            import io
+            data = response.json()
             
             results = []
-            csv_file = io.StringIO(response.text)
-            reader = csv.reader(csv_file)
-            
-            try:
-                next(reader) # Skip header row
-            except StopIteration:
-                return Response([]) # Empty file
-
-            for row in reader:
-                if len(row) == 2:
-                    symbol, name = row
-                    if keywords.lower() in symbol.lower() or keywords.lower() in name.lower():
-                        results.append({'symbol': symbol, 'name': name})
+            for item in data:
+                # item is {'description': 'Binance BTC/USDT', 'displaySymbol': 'BTC/USDT', 'symbol': 'BINANCE:BTCUSDT'}
+                if keywords.lower() in item['description'].lower() or keywords.lower() in item['displaySymbol'].lower():
+                    results.append({'symbol': item['symbol'], 'name': item['description']})
             
             return Response(results[:100])
 
@@ -182,18 +185,15 @@ def search_symbols(request):
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     else: # For stocks and other types
-        url = f'https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords={keywords}&apikey={api_key}'
+        url = f'{base_url}/search?q={keywords}&token={api_key}'
         try:
             response = requests.get(url)
             response.raise_for_status()
             data = response.json()
 
-            if "Note" in data:
-                logger.warning(f"Alpha Vantage API rate limit likely exceeded when searching for {keywords}.")
-                return Response([], status=status.HTTP_200_OK)
-
-            if 'bestMatches' in data:
-                results = [{'symbol': item['1. symbol'], 'name': item['2. name']} for item in data['bestMatches']]
+            if 'result' in data:
+                # data['result'] is [{'description': 'APPLE INC', 'displaySymbol': 'AAPL', 'symbol': 'AAPL', 'type': 'Common Stock'}]
+                results = [{'symbol': item['symbol'], 'name': item['description']} for item in data['result']]
                 return Response(results)
             else:
                 return Response([], status=status.HTTP_200_OK)
