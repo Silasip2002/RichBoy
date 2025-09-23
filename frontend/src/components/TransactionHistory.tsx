@@ -18,7 +18,7 @@ import {
     Select,
     MenuItem,
 } from '@mui/material';
-import constants from '../data/constants.json';
+import { getAllTransactions } from '../services/api';
 
 interface Transaction {
     id: number;
@@ -78,43 +78,28 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
     useEffect(() => {
         const fetchAllTransactions = async () => {
             if (token) {
-                let allTransactions: Transaction[] = [];
-                let page = 1;
-                while (true) {
-                    const response = await fetch(`http://localhost:8000/api/transactions/?page=${page}&page_size=100`, {
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
+                try {
+                    const allTransactions = await getAllTransactions(token);
+                    const { totalIncome, totalExpense, netBalance } = allTransactions.reduce(
+                        (acc, transaction) => {
+                            const amount = parseFloat(transaction.amount);
+                            if (transaction.transaction_type === 'income') {
+                                acc.totalIncome += amount;
+                            } else if (transaction.transaction_type === 'expense') {
+                                acc.totalExpense += amount;
+                            }
+                            acc.netBalance = acc.totalIncome - acc.totalExpense;
+                            return acc;
                         },
-                    });
-                    if (response.ok) {
-                        const data = await response.json();
-                        allTransactions = [...allTransactions, ...data.results];
-                        if (!data.next) {
-                            break;
-                        }
-                        page++;
-                    } else {
-                        break;
-                    }
+                        { totalIncome: 0, totalExpense: 0, netBalance: 0 }
+                    );
+
+                    setTotalIncome(totalIncome);
+                    setTotalExpense(totalExpense);
+                    setNetBalance(netBalance);
+                } catch (error) {
+                    console.error('Failed to fetch all transactions', error);
                 }
-
-                const { totalIncome, totalExpense, netBalance } = allTransactions.reduce(
-                    (acc, transaction) => {
-                        const amount = parseFloat(transaction.amount);
-                        if (transaction.transaction_type === 'income') {
-                            acc.totalIncome += amount;
-                        } else if (transaction.transaction_type === 'expense') {
-                            acc.totalExpense += amount;
-                        }
-                        acc.netBalance = acc.totalIncome - acc.totalExpense;
-                        return acc;
-                    },
-                    { totalIncome: 0, totalExpense: 0, netBalance: 0 }
-                );
-
-                setTotalIncome(totalIncome);
-                setTotalExpense(totalExpense);
-                setNetBalance(netBalance);
             }
         };
 

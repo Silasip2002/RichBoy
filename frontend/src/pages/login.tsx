@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Box, Button, Card, CardContent, TextField, Typography, CircularProgress } from '@mui/material';
+import { loginUser } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from 'next/router';
 
@@ -15,24 +16,11 @@ const LoginPage: React.FC = () => {
         setLoading(true);
         setError(null);
         try {
-            const response = await fetch('http://localhost:8000/api/users/login/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ username, password }),
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                await login(data.access);
-                router.push('/');
-            } else {
-                const errorData = await response.json();
-                setError(errorData.detail || 'Login failed');
-            }
-        } catch (error) {
-            setError('Login failed. Please try again.');
+            const data = await loginUser({ username, password });
+            await login(data.access);
+            router.push('/');
+        } catch (error: any) {
+            setError(error.message || 'Login failed. Please try again.');
             console.error('Login failed', error);
         } finally {
             setLoading(false);

@@ -3,6 +3,7 @@ import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import AssetCard from '../components/AssetCard';
+import { getAccounts, getAssets, getStockPrice } from '../services/api';
 import AssetList from '../components/AssetList';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -17,55 +18,38 @@ const Assets: React.FC = () => {
     const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
     const fetchAccounts = async () => {
+        if (!token) return;
         try {
-            const response = await fetch('http://localhost:8000/api/accounts/', {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                },
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setAccounts(data.results);
-            }
+            const data = await getAccounts(token);
+            setAccounts(data.results);
         } catch (error) {
             console.error('Failed to fetch accounts', error);
         }
     };
 
     const fetchAssets = async () => {
+        if (!token) return;
         setLoading(true);
         try {
-            const response = await fetch('http://localhost:8000/api/assets/', {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                },
-            });
-            if (response.ok) {
-                const data = await response.json();
-                const assetsWithMarketPrice = await Promise.all(data.results.map(async (asset: any) => {
-                    let market_price = asset.price; // Default to purchase price
-                    if (asset.asset_type === 'stocks' && asset.symbol) {
-                        try {
-                            const priceResponse = await fetch(`http://localhost:8000/api/get_stock_price/?symbol=${asset.symbol}`, {
-                                headers: {
-                                    'Authorization': `Bearer ${token}`,
-                                },
-                            });
-                            if (priceResponse.ok) {
-                                const priceData = await priceResponse.json();
-                                market_price = priceData.price;
-                            } else if (priceResponse.status === 404) {
-                                console.warn(`Could not find price for symbol: ${asset.symbol}`);
-                            }
-                        } catch (error) {
-                            console.error(`Failed to fetch price for ${asset.symbol}`, error);
+            const data = await getAssets(token);
+            const assetsWithMarketPrice = await Promise.all(data.results.map(async (asset: any) => {
+                let market_price = asset.price; // Default to purchase price
+                if ((asset.asset_type === 'stocks' || asset.asset_type === 'crypto') && asset.symbol) {
+                    try {
+                        const priceData = await getStockPrice(token, asset.symbol, asset.asset_type);
+                        if (priceData) {
+                            market_price = priceData.price;
+                        } else {
+                            console.warn(`Could not find price for symbol: ${asset.symbol}`);
                         }
+                    } catch (error) {
+                        console.error(`Failed to fetch price for ${asset.symbol}`, error);
                     }
-                    return { ...asset, market_price };
-                }));
-                setAssets(assetsWithMarketPrice);
-                localStorage.setItem('cachedAssets', JSON.stringify({ assets: assetsWithMarketPrice, timestamp: Date.now() }));
-            }
+                }
+                return { ...asset, market_price };
+            }));
+            setAssets(assetsWithMarketPrice);
+            localStorage.setItem('cachedAssets', JSON.stringify({ assets: assetsWithMarketPrice, timestamp: Date.now() }));
         } catch (error) {
             console.error('Failed to fetch assets', error);
         } finally {

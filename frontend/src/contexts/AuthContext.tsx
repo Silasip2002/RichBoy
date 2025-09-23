@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 
+import { getUserProfile } from '../services/api';
+
 interface User {
     id: number;
     username: string;
@@ -35,17 +37,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const fetchUserProfile = async (token: string) => {
         try {
-            const response = await fetch('http://localhost:8000/api/users/profile/', {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                },
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setUser(data.user);
-            } else {
-                logout();
-            }
+            const data = await getUserProfile(token);
+            setUser(data.user);
         } catch (error) {
             console.error('Failed to fetch user profile', error);
             logout();

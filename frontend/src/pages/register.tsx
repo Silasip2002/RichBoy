@@ -3,6 +3,7 @@ import {
     Alert, Box, Button, TextField, Typography, Container, Grid, Link, Avatar
 } from '@mui/material';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import { registerUser } from '../services/api';
 import { useRouter } from 'next/router';
 
 const RegisterPage: React.FC = () => {
@@ -20,21 +21,12 @@ const RegisterPage: React.FC = () => {
             return;
         }
 
-        const response = await fetch('http://localhost:8000/api/users/register/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ username, email, password }),
-        });
-
-        if (response.ok) {
+        try {
+            await registerUser({ username, email, password });
             router.push('/login');
-        } else {
-            const errorData = await response.json();
-            const errorMessage = Object.values(errorData).flat().join(' ');
-            setError(errorMessage);
-            console.error('Registration failed:', errorData);
+        } catch (error: any) {
+            setError(error.message || 'Registration failed');
+            console.error('Registration failed:', error);
         }
     };
 

@@ -3,6 +3,7 @@ import { Card, CardContent, Box, Typography, TextField, Select, MenuItem, Button
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useAuth } from '../contexts/AuthContext';
+import { updateAsset, deleteAsset, createAsset, getStockPrice, searchSymbols } from '../services/api';
 
 const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetStateAction<any[]>>, accounts: any[], setAccounts: React.Dispatch<React.SetStateAction<any[]>>, loading: boolean }> = ({ assets, setAssets, accounts, setAccounts, loading }) => {
   const { token } = useAuth();
@@ -65,7 +66,7 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
   };
 
   const handleUpdateAsset = async () => {
-    if (!editingAsset) return;
+    if (!editingAsset || !token) return;
     const newErrors = validate(editingAsset);
     if (Object.keys(newErrors).length > 0) {
         setErrors(newErrors);
@@ -80,25 +81,12 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
         cost: (price * quantity).toFixed(2),
     };
     try {
-        const response = await fetch(`http://localhost:8000/api/assets/${editingAsset.id}/`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
-            },
-            body: JSON.stringify(assetToSend),
-        });
-        if (response.ok) {
-            const data = await response.json();
-            const updatedAssets = assets.map((asset) => (asset.id === data.id ? { ...data, market_price: editingAsset.market_price } : asset));
-            setAssets(updatedAssets);
-            localStorage.setItem('assets', JSON.stringify(updatedAssets));
-            setEditAssetOpen(false);
-            setEditingAsset(null);
-        } else {
-            const errorData = await response.json();
-            console.error('Failed to update asset', errorData);
-        }
+        const data = await updateAsset(token, editingAsset.id, assetToSend);
+        const updatedAssets = assets.map((asset) => (asset.id === data.id ? { ...data, market_price: editingAsset.market_price } : asset));
+        setAssets(updatedAssets);
+        localStorage.setItem('assets', JSON.stringify(updatedAssets));
+        setEditAssetOpen(false);
+        setEditingAsset(null);
     } catch (error) {
         console.error('Failed to update asset', error);
     }
@@ -110,14 +98,9 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
   };
 
   const handleDeleteAsset = async () => {
-    if (!deletingAssetId) return;
+    if (!deletingAssetId || !token) return;
     try {
-        const response = await fetch(`http://localhost:8000/api/assets/${deletingAssetId}/`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-            },
-        });
+        const response = await deleteAsset(token, deletingAssetId);
         if (response.ok) {
             const updatedAssets = assets.filter((asset) => asset.id !== deletingAssetId);
             setAssets(updatedAssets);
@@ -132,9 +115,8 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
     }
   };
 
-  
-
   const handleAddAsset = async () => {
+    if (!token) return;
     const newErrors = validate(newAsset);
     if (Object.keys(newErrors).length > 0) {
         setErrors(newErrors);
@@ -147,50 +129,31 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
         cost: (parseFloat(newAsset.price) * parseFloat(newAsset.quantity)).toFixed(2),
     };
     try {
-        const response = await fetch('http://localhost:8000/api/assets/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
-            },
-            body: JSON.stringify(assetToSend),
-        });
-        if (response.ok) {
-            const data = await response.json();
-            const newAssets = [...assets, { ...data, market_price: data.price }];
-            setAssets(newAssets);
-            localStorage.setItem('assets', JSON.stringify(newAssets));
-            handleClose();
-        } else {
-            const errorData = await response.json();
-            console.error('Failed to add asset', errorData);
-        }
+        const data = await createAsset(token, assetToSend);
+        const newAssets = [...assets, { ...data, market_price: data.price }];
+        setAssets(newAssets);
+        localStorage.setItem('assets', JSON.stringify(newAssets));
+        handleClose();
     } catch (error) {
         console.error('Failed to add asset', error);
     }
   };
 
-  const handleFetchPrice = async (symbol: string, type: 'new' | 'edit') => {
-    if (!symbol) {
+  const handleFetchPrice = async (symbol: string, type: 'new' | 'edit', assetType: string) => {
+    if (!symbol || !token) {
         setErrors({ ...errors, symbol: 'Symbol is required to fetch price' });
         return;
     }
     try {
-        const response = await fetch(`http://localhost:8000/api/get_stock_price/?symbol=${symbol}`, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-            },
-        });
-        if (response.ok) {
-            const data = await response.json();
+        const data = await getStockPrice(token, symbol, assetType);
+        if (data) {
             if (type === 'new') {
                 setNewAsset(prev => ({ ...prev, price: data.price, name: data.name || prev.name }));
             } else {
                 setEditingAsset(prev => ({ ...prev, market_price: data.price, name: data.name || prev.name }));
             }
         } else {
-            const errorData = await response.json();
-            setErrors({ ...errors, symbol: errorData.error || 'Could not fetch price' });
+            setErrors({ ...errors, symbol: 'Could not fetch price' });
         }
     } catch (error) {
         setErrors({ ...errors, symbol: 'Failed to fetch price' });
@@ -198,17 +161,10 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
   };
 
   const handleSymbolSearch = async (keywords: string, assetType: string) => {
-    if (keywords.length > 1) {
+    if (keywords.length > 1 && token) {
         try {
-            const response = await fetch(`http://localhost:8000/api/search_symbols/?keywords=${keywords}&type=${assetType}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                },
-            });
-            if (response.ok) {
-                const data = await response.json();
-                                setSymbolOptions(data.map((item: any) => ({ label: `${item.symbol} - ${item.name}`, value: item.symbol, name: item.name })));
-            }
+            const data = await searchSymbols(token, keywords, assetType);
+            setSymbolOptions(data.map((item: any) => ({ label: `${item.symbol} - ${item.name}`, value: item.symbol, name: item.name })));
         } catch (error) {
             console.error('Failed to search symbols', error);
         }
@@ -216,8 +172,6 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
         setSymbolOptions([]);
     }
   };
-
-  
 
   const getTypeChip = (type: string) => {
     let color: 'primary' | 'secondary' | 'default' | 'success' | 'warning' | 'error' | 'info' = 'default';
@@ -351,7 +305,7 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
                 onChange={(event, newValue) => {
                     if (newValue) {
                         setNewAsset(prev => ({ ...prev, name: newValue.name, symbol: newValue.value }));
-                        handleFetchPrice(newValue.value, 'new');
+                        handleFetchPrice(newValue.value, 'new', newAsset.asset_type);
                     }
                 }}
                 renderInput={(params) => <TextField {...params} label="Asset Name" margin="dense" autoFocus error={!!errors.name} helperText={errors.name} />}
@@ -468,7 +422,7 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
           />
                      {editingAsset?.asset_type === 'stocks' && (
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Button onClick={() => handleFetchPrice(editingAsset.symbol, 'edit')} variant="outlined" sx={{ mt: 1 }}>Fetch Price</Button>
+                          <Button onClick={() => handleFetchPrice(editingAsset.symbol, 'edit', editingAsset.asset_type)} variant="outlined" sx={{ mt: 1 }}>Fetch Price</Button>
                       </Box>
                      )}
                     <TextField

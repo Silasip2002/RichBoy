@@ -52,3 +52,138 @@ export const createAccount = async (token: string, accountData: any) => {
     }
     return response.json();
 };
+
+export const getAssets = async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/assets/`, {
+        headers: getAuthHeaders(token),
+    });
+    if (!response.ok) {
+        throw new Error('Failed to fetch assets');
+    }
+    return response.json();
+};
+
+export const createAsset = async (token: string, assetData: any) => {
+    const response = await fetch(`${API_BASE_URL}/assets/`, {
+        method: 'POST',
+        headers: getAuthHeaders(token),
+        body: JSON.stringify(assetData),
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(Object.values(errorData).flat().join(' ') || 'Failed to create asset');
+    }
+    return response.json();
+};
+
+export const updateAsset = async (token: string, assetId: number, assetData: any) => {
+    const response = await fetch(`${API_BASE_URL}/assets/${assetId}/`, {
+        method: 'PUT',
+        headers: getAuthHeaders(token),
+        body: JSON.stringify(assetData),
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(Object.values(errorData).flat().join(' ') || 'Failed to update asset');
+    }
+    return response.json();
+};
+
+export const deleteAsset = async (token: string, assetId: number) => {
+    const response = await fetch(`${API_BASE_URL}/assets/${assetId}/`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(token),
+    });
+    if (!response.ok) {
+        throw new Error('Failed to delete asset');
+    }
+    return response;
+};
+
+
+export const getStockPrice = async (token: string, symbol: string, assetType: string) => {
+    const assetTypeParam = assetType === 'crypto' ? '&type=crypto' : '';
+    const url = `${API_BASE_URL}/get_stock_price/?symbol=${symbol}${assetTypeParam}`;
+    const response = await fetch(url, {
+        headers: getAuthHeaders(token),
+    });
+    if (!response.ok) {
+        if (response.status === 404) {
+            return null;
+        }
+        throw new Error('Failed to fetch stock price');
+    }
+    return response.json();
+};
+
+export const searchSymbols = async (token: string, keywords: string, assetType: string) => {
+    const response = await fetch(`${API_BASE_URL}/search_symbols/?keywords=${keywords}&type=${assetType}`, {
+        headers: getAuthHeaders(token),
+    });
+    if (!response.ok) {
+        throw new Error('Failed to search symbols');
+    }
+    return response.json();
+};
+
+export const getAllTransactions = async (token: string) => {
+    let allTransactions: any[] = [];
+    let page = 1;
+    while (true) {
+        const response = await fetch(`${API_BASE_URL}/transactions/?page=${page}&page_size=100`, {
+            headers: getAuthHeaders(token),
+        });
+        if (response.ok) {
+            const data = await response.json();
+            allTransactions = [...allTransactions, ...data.results];
+            if (!data.next) {
+                break;
+            }
+            page++;
+        } else {
+            throw new Error('Failed to fetch all transactions');
+        }
+    }
+    return allTransactions;
+};
+
+export const getUserProfile = async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/users/profile/`, {
+        headers: getAuthHeaders(token),
+    });
+    if (!response.ok) {
+        throw new Error('Failed to fetch user profile');
+    }
+    return response.json();
+};
+
+export const loginUser = async (credentials: any) => {
+    const response = await fetch(`${API_BASE_URL}/users/login/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(credentials),
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Login failed');
+    }
+    return response.json();
+};
+
+export const registerUser = async (userInfo: any) => {
+    const response = await fetch(`${API_BASE_URL}/users/register/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userInfo),
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        const errorMessage = Object.values(errorData).flat().join(' ');
+        throw new Error(errorMessage || 'Registration failed');
+    }
+    return response.json();
+};
