@@ -3,7 +3,7 @@ import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import AssetCard from '../components/AssetCard';
-import { getAccounts, getAssets, getStockPrice } from '../services/api';
+import { getAccounts, getAssets, getAssetDetails } from '../services/api';
 import AssetList from '../components/AssetList';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -36,11 +36,9 @@ const Assets: React.FC = () => {
                 let market_price = asset.price; // Default to purchase price
                 if ((asset.asset_type === 'stocks' || asset.asset_type === 'crypto') && asset.symbol) {
                     try {
-                        const priceData = await getStockPrice(token, asset.symbol, asset.asset_type);
+                        const priceData = await getAssetDetails(token, asset.symbol, asset.asset_type);
                         if (priceData) {
                             market_price = priceData.price;
-                        } else {
-                            console.warn(`Could not find price for symbol: ${asset.symbol}`);
                         }
                     } catch (error) {
                         console.error(`Failed to fetch price for ${asset.symbol}`, error);

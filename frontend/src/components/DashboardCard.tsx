@@ -1,12 +1,29 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, Typography, Box } from '@mui/material';
+import { useAuth } from '../contexts/AuthContext';
+import { getPortfolioSummary } from '../services/api';
 
 const DashboardCard: React.FC = () => {
-  // Static data for now, will be dynamic later
-  const totalPortfolioValue = "$1,234,567.89";
-  const todaysChange = "+$1,234.56 (+1.23%)";
-  const annualReturn = "+15.00%";
-  const cashBalance = "$50,000.00";
+  const { token } = useAuth();
+  const [totalPortfolioValue, setTotalPortfolioValue] = useState("$0.00");
+  const [todaysChange, setTodaysChange] = useState("+$0.00 (+0.00%)");
+  const [cashBalance, setCashBalance] = useState("$0.00");
+
+  useEffect(() => {
+    const fetchPortfolioSummary = async () => {
+      if (!token) return;
+      try {
+        const data = await getPortfolioSummary(token);
+        setTotalPortfolioValue(`$${data.total_portfolio_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+        setTodaysChange(`${data.todays_change >= 0 ? '+' : ''}$${Math.abs(data.todays_change).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${data.todays_change.toFixed(2)}%)`);
+        setCashBalance(`$${data.cash_balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+      } catch (error) {
+        console.error('Failed to fetch portfolio summary', error);
+      }
+    };
+
+    fetchPortfolioSummary();
+  }, [token]);
 
   // Determine color for Today's Change
   const isPositiveChange = todaysChange.startsWith('+');
@@ -37,7 +54,7 @@ const DashboardCard: React.FC = () => {
               Annual Return
             </Typography>
             <Typography variant="h6" component="div" sx={{ fontSize: '1rem' }}>
-              {annualReturn}
+              +15.00%
             </Typography>
           </Box>
           <Box sx={{ width: '25%', flexGrow: 1 }}> {/* Replaced Grid item with Box */}

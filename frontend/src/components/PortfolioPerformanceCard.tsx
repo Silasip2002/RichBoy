@@ -1,13 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, Typography, Box, Divider, Button, ButtonGroup } from '@mui/material';
 import { LineChart, PieChart } from '@mui/x-charts';
+import { useAuth } from '../contexts/AuthContext';
+import { getAssetAllocation } from '../services/api';
 
 type Timeframe = '1M' | '3M' | '6M' | 'YTD' | '1Y' | 'All';
 
 const PortfolioPerformanceCard: React.FC = () => {
+  const { token } = useAuth();
   const [selectedTimeframe, setSelectedTimeframe] = useState<Timeframe>('1Y'); // Default to 1 Year
+  const [assetAllocation, setAssetAllocation] = useState<any[]>([]);
 
   const timeframes: Timeframe[] = ['1M', '3M', '6M', 'YTD', '1Y', 'All'];
+
+  useEffect(() => {
+    const fetchAssetAllocation = async () => {
+      if (!token) return;
+      try {
+        const data = await getAssetAllocation(token);
+        const pieChartData = Object.keys(data).map((key, index) => ({
+          id: index,
+          value: data[key],
+          label: key,
+        }));
+        setAssetAllocation(pieChartData);
+      } catch (error) {
+        console.error('Failed to fetch asset allocation', error);
+      }
+    };
+
+    fetchAssetAllocation();
+  }, [token]);
 
   // Mock data for Line Chart
   const lineChartData: { [key in Timeframe]: { series: { data: number[] }[], xAxis: { scaleType: 'point', data: string[] }[] } } = {
@@ -18,15 +41,6 @@ const PortfolioPerformanceCard: React.FC = () => {
     '1Y': { series: [{ data: [200, 210, 205, 220, 215, 230, 225, 240, 235, 250] }], xAxis: [{ scaleType: 'point', data: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'] }] },
     'All': { series: [{ data: [300, 310, 305, 320, 315, 330, 325, 340, 335, 350] }], xAxis: [{ scaleType: 'point', data: ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6', 'Year 7', 'Year 8', 'Year 9', 'Year 10'] }] },
   };
-
-  // Mock data for Pie Chart
-  const pieChartData = [
-    { id: 0, value: 10, label: 'Stocks' },
-    { id: 1, value: 15, label: 'Bonds' },
-    { id: 2, value: 10, label: 'Real Estate' },
-    { id: 3, value: 5, label: 'Cash' },
-    { id: 4, value: 10, label: 'Crypto' },
-  ];
 
   return (
     <Card sx={{ minWidth: 275, mb: 3 }}>
@@ -78,7 +92,7 @@ const PortfolioPerformanceCard: React.FC = () => {
           <PieChart
             series={[
               {
-                data: pieChartData,
+                data: assetAllocation,
                 highlightScope: { fade: 'global', highlight: 'item' },
                 faded: { innerRadius: 30, additionalRadius: -30, color: 'gray' },
               },

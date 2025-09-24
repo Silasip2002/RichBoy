@@ -6,3 +6,5 @@ djangorestframework
 django-cors-headers
 djangorestframework-simplejwt
 requests
+yfinance
+yahoofinancials

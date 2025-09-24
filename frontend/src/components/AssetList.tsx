@@ -3,7 +3,7 @@ import { Card, CardContent, Box, Typography, TextField, Select, MenuItem, Button
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useAuth } from '../contexts/AuthContext';
-import { updateAsset, deleteAsset, createAsset, getStockPrice, searchSymbols } from '../services/api';
+import { updateAsset, deleteAsset, createAsset, getAssetDetails, searchSymbols } from '../services/api';
 
 const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetStateAction<any[]>>, accounts: any[], setAccounts: React.Dispatch<React.SetStateAction<any[]>>, loading: boolean }> = ({ assets, setAssets, accounts, setAccounts, loading }) => {
   const { token } = useAuth();
@@ -145,7 +145,7 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
         return;
     }
     try {
-        const data = await getStockPrice(token, symbol, assetType);
+        const data = await getAssetDetails(token, symbol, assetType);
         if (data) {
             if (type === 'new') {
                 setNewAsset(prev => ({ ...prev, price: data.price, name: data.name || prev.name }));
@@ -160,13 +160,14 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
     }
   };
 
-  const handleSymbolSearch = async (keywords: string, assetType: string) => {
+  const handleSymbolSearch = async (keywords: string) => {
     if (keywords.length > 1 && token) {
         try {
-            const data = await searchSymbols(token, keywords, assetType);
+            const data = await searchSymbols(token, keywords, newAsset.asset_type);
             setSymbolOptions(data.map((item: any) => ({ label: `${item.symbol} - ${item.name}`, value: item.symbol, name: item.name })));
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to search symbols', error);
+            setErrors({ ...errors, symbol: error.message });
         }
     } else {
         setSymbolOptions([]);
@@ -300,7 +301,7 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
                 options={symbolOptions}
                 getOptionLabel={(option) => option.label}
                 onInputChange={(event, newInputValue) => {
-                    handleSymbolSearch(newInputValue, newAsset.asset_type);
+                    handleSymbolSearch(newInputValue);
                 }}
                 onChange={(event, newValue) => {
                     if (newValue) {

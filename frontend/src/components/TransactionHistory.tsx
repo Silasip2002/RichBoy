@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import constants from '../data/constants.json';
 import { useAuth } from '../contexts/AuthContext';
 import {
     Card,

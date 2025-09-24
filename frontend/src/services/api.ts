@@ -101,9 +101,8 @@ export const deleteAsset = async (token: string, assetId: number) => {
 };
 
 
-export const getStockPrice = async (token: string, symbol: string, assetType: string) => {
-    const assetTypeParam = assetType === 'crypto' ? '&type=crypto' : '';
-    const url = `${API_BASE_URL}/get_stock_price/?symbol=${symbol}${assetTypeParam}`;
+export const getAssetDetails = async (token: string, symbol: string, assetType: string) => {
+    const url = `${API_BASE_URL}/get_asset_details/?symbol=${symbol}&type=${assetType}`;
     const response = await fetch(url, {
         headers: getAuthHeaders(token),
     });
@@ -111,7 +110,7 @@ export const getStockPrice = async (token: string, symbol: string, assetType: st
         if (response.status === 404) {
             return null;
         }
-        throw new Error('Failed to fetch stock price');
+        throw new Error('Failed to fetch asset details');
     }
     return response.json();
 };
@@ -121,9 +120,15 @@ export const searchSymbols = async (token: string, keywords: string, assetType: 
         headers: getAuthHeaders(token),
     });
     if (!response.ok) {
-        throw new Error('Failed to search symbols');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to search symbols');
     }
-    return response.json();
+    const data = await response.json();
+    if (data.message) {
+        alert(data.message);
+        return [];
+    }
+    return data;
 };
 
 export const getAllTransactions = async (token: string) => {
@@ -184,6 +189,26 @@ export const registerUser = async (userInfo: any) => {
         const errorData = await response.json();
         const errorMessage = Object.values(errorData).flat().join(' ');
         throw new Error(errorMessage || 'Registration failed');
+    }
+    return response.json();
+};
+
+export const getPortfolioSummary = async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/get_portfolio_summary/`, {
+        headers: getAuthHeaders(token),
+    });
+    if (!response.ok) {
+        throw new Error('Failed to fetch portfolio summary');
+    }
+    return response.json();
+};
+
+export const getAssetAllocation = async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/get_asset_allocation/`, {
+        headers: getAuthHeaders(token),
+    });
+    if (!response.ok) {
+        throw new Error('Failed to fetch asset allocation');
     }
     return response.json();
 };

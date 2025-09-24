@@ -149,8 +149,4 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Finnhub API Key
-# In production, it's recommended to store this in an environment variable.
-FINNHUB_API_KEY = 'cnuf1jpr01quhjierf9gcnuf1jpr01quhjierfa0' # Please replace with your actual key
-FINNHUB_API_URL = 'https://finnhub.io/api/v1'
 

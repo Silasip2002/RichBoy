@@ -4,9 +4,11 @@ from .views import (
     TransactionViewSet, 
     AccountViewSet, 
     AssetViewSet, 
-    get_stock_price, 
-        search_symbols,
-        CategoryViewSet
+    get_asset_details, 
+    search_symbols,
+    CategoryViewSet,
+    get_portfolio_summary,
+    get_asset_allocation
     ) 
     
 router = DefaultRouter()
@@ -16,7 +18,9 @@ router.register(r'assets', AssetViewSet, basename='asset')
 router.register(r'categories', CategoryViewSet, basename='category')
 # Specific paths must come BEFORE the router include
 urlpatterns = [
-    path('get_stock_price/', get_stock_price, name='get_stock_price'),
+    path('get_asset_allocation/', get_asset_allocation, name='get_asset_allocation'),
+    path('get_portfolio_summary/', get_portfolio_summary, name='get_portfolio_summary'),
+    path('get_asset_details/', get_asset_details, name='get_asset_details'),
     path('search_symbols/', search_symbols, name='search_symbols'),
     path('', include(router.urls)),
 ]

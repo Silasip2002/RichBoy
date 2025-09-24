@@ -1,10 +1,9 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-import requests
 import logging
-import time
-from django.conf import settings
+import yfinance as yf
+import requests
 from .models import Transaction, Account, Asset
 from .serializers import TransactionSerializer, AccountSerializer, AssetSerializer, CategorySerializer
 
@@ -92,111 +91,101 @@ class AssetViewSet(viewsets.ModelViewSet):
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
-def get_stock_price(request):
+def get_asset_details(request):
     symbol = request.query_params.get('symbol', None)
     asset_type = request.query_params.get('type', 'stocks')
+
     if not symbol:
         return Response({'error': 'Symbol parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-    api_key = settings.FINNHUB_API_KEY
-    base_url = settings.FINNHUB_API_URL
-    
     try:
         if asset_type == 'crypto':
-            # It's a crypto symbol
-            end_time = int(time.time())
-            start_time = end_time - 86400 * 2 # 2 days ago to make sure we get a candle
+            symbol = f'{symbol}-USD'
 
-            url = f'{base_url}/crypto/candle?symbol={symbol}&resolution=D&from={start_time}&to={end_time}&token={api_key}'
-            response = requests.get(url)
-            response.raise_for_status()
-            data = response.json()
+        ticker = yf.Ticker(symbol)
+        info = ticker.info
 
-            if data.get('s') == 'ok' and data.get('c') and data['c']:
-                price = data['c'][-1] # last closing price
-                # Construct name from symbol
-                _, pair = symbol.split(':')
-                name = pair.replace('USDT', '/USD') 
+        price = info.get('regularMarketPrice')
+        name = info.get('longName', info.get('shortName'))
+
+        if price and name:
+            return Response({'price': price, 'name': name})
+        else:
+            # Fallback for symbols that might not have 'regularMarketPrice'
+            hist = ticker.history(period="1d")
+            if not hist.empty:
+                price = hist['Close'].iloc[-1]
+                if not name:
+                    name = symbol # Fallback name
                 return Response({'price': price, 'name': name})
-            else:
-                logger.error(f"Finnhub crypto response for {symbol}: {data}")
-                return Response({'error': 'Could not fetch data for the given crypto symbol'}, status=status.HTTP_404_NOT_FOUND)
 
-        else: # It's a stock symbol
-            # Fetch Price
-            price_url = f'{base_url}/quote?symbol={symbol}&token={api_key}'
-            price_response = requests.get(price_url)
-            price_response.raise_for_status()
-            price_data = price_response.json()
+            return Response({'error': 'Could not fetch data for the given symbol'}, status=status.HTTP_404_NOT_FOUND)
 
-            # Fetch Name/Profile
-            profile_url = f'{base_url}/stock/profile2?symbol={symbol}&token={api_key}'
-            profile_response = requests.get(profile_url)
-            profile_response.raise_for_status()
-            profile_data = profile_response.json()
-
-            price = price_data.get('c')
-            name = profile_data.get('name')
-
-            if price is not None and price != 0:
-                return Response({'price': price, 'name': name if name else ''})
-            else:
-                logger.error(f"Finnhub stock response for {symbol}: price_data={price_data}, profile_data={profile_data}")
-                return Response({'error': 'Could not fetch data for the given stock symbol'}, status=status.HTTP_404_NOT_FOUND)
-
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Request failed for {symbol}: {e}")
-        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     except Exception as e:
-        logger.error(f"An error occurred while fetching price for {symbol}: {e}")
+        logger.error(f"An error occurred while fetching data for {symbol}: {e}")
         return Response({'error': 'An unexpected error occurred.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+import requests
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def search_symbols(request):
     keywords = request.query_params.get('keywords', None)
-    asset_type = request.query_params.get('type', 'stocks')
 
     if not keywords:
         return Response({'error': 'Keywords parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-    api_key = settings.FINNHUB_API_KEY
-    base_url = settings.FINNHUB_API_URL
+    try:
+        url = f"https://query1.finance.yahoo.com/v1/finance/search?q={keywords}"
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36'}
+        response = requests.get(url, headers=headers)
+        data = response.json()
+        results = []
+        for item in data['quotes']:
+            results.append({'symbol': item['symbol'], 'name': item.get('longname', item.get('shortname', ''))})
+        return Response(results)
 
-    if asset_type == 'crypto':
-        # For crypto, we'll search symbols from a major exchange like Binance
-        exchange = 'binance'
-        url = f'{base_url}/crypto/symbol?exchange={exchange}&token={api_key}'
-        try:
-            response = requests.get(url)
-            response.raise_for_status()
-            data = response.json()
-            
-            results = []
-            for item in data:
-                # item is {'description': 'Binance BTC/USDT', 'displaySymbol': 'BTC/USDT', 'symbol': 'BINANCE:BTCUSDT'}
-                if keywords.lower() in item['description'].lower() or keywords.lower() in item['displaySymbol'].lower():
-                    results.append({'symbol': item['symbol'], 'name': item['description']})
-            
-            return Response(results[:100])
+    except Exception as e:
+        logger.error(f"An error occurred while searching for symbols: {e}")
+        return Response([], status=status.HTTP_200_OK)
 
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to fetch crypto list: {e}")
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_portfolio_summary(request):
+    user = request.user
+    assets = Asset.objects.filter(user=user)
+    accounts = Account.objects.filter(user=user)
 
-    else: # For stocks and other types
-        url = f'{base_url}/search?q={keywords}&token={api_key}'
-        try:
-            response = requests.get(url)
-            response.raise_for_status()
-            data = response.json()
+    total_portfolio_value = 0
+    total_cost = 0
+    for asset in assets:
+        total_portfolio_value += asset.market_value
+        total_cost += asset.cost
 
-            if 'result' in data:
-                # data['result'] is [{'description': 'APPLE INC', 'displaySymbol': 'AAPL', 'symbol': 'AAPL', 'type': 'Common Stock'}]
-                results = [{'symbol': item['symbol'], 'name': item['description']} for item in data['result']]
-                return Response(results)
-            else:
-                return Response([], status=status.HTTP_200_OK)
-        except (requests.exceptions.RequestException, ValueError) as e: # ValueError for json decoding
-            logger.error(f"Failed to search stock symbols for {keywords}: {e}")
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    todays_change = 0
+    if total_cost > 0:
+        todays_change = ((total_portfolio_value - total_cost) / total_cost) * 100
+
+    cash_balance = 0
+    for account in accounts:
+        if account.account_type == 'cash':
+            cash_balance += account.balance
+
+    return Response({
+        'total_portfolio_value': total_portfolio_value,
+        'todays_change': todays_change,
+        'cash_balance': cash_balance,
+    })
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_asset_allocation(request):
+    user = request.user
+    assets = Asset.objects.filter(user=user)
+    asset_allocation = {}
+    for asset in assets:
+        if asset.asset_type not in asset_allocation:
+            asset_allocation[asset.asset_type] = 0
+        asset_allocation[asset.asset_type] += asset.market_value
+
+    return Response(asset_allocation)
