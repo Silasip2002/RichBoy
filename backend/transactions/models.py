@@ -12,6 +12,7 @@ CURRENCY_CHOICES = [
     ('CNY', 'CNY - Chinese Yuan'),
     ('SEK', 'SEK - Swedish Krona'),
     ('NZD', 'NZD - New Zealand Dollar'),
+    ('HKD', 'HKD - Hong Kong Dollar'),
 ]
 
 ACCOUNT_CHOICES = [
