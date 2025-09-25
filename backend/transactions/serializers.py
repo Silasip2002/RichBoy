@@ -1,8 +1,9 @@
 from rest_framework import serializers
-from .models import Transaction, Account, Asset
+from .models import Transaction, Account, Asset, CURRENCY_CHOICES
 
 class TransactionSerializer(serializers.ModelSerializer):
     user = serializers.ReadOnlyField(source='user.username')
+    currency = serializers.ChoiceField(choices=CURRENCY_CHOICES)
 
     class Meta:
         model = Transaction

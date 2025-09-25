@@ -104,7 +104,7 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
         category,
         date,
         is_recurring: isRecurring,
-        account,
+        account: Number(account),
       });
       console.log('Transaction saved');
       onTransactionAdded();

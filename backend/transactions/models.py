@@ -1,6 +1,19 @@
 from django.db import models
 from django.contrib.auth.models import User
 
+CURRENCY_CHOICES = [
+    ('USD', 'USD - United States Dollar'),
+    ('EUR', 'EUR - Euro'),
+    ('JPY', 'JPY - Japanese Yen'),
+    ('GBP', 'GBP - British Pound Sterling'),
+    ('AUD', 'AUD - Australian Dollar'),
+    ('CAD', 'CAD - Canadian Dollar'),
+    ('CHF', 'CHF - Swiss Franc'),
+    ('CNY', 'CNY - Chinese Yuan'),
+    ('SEK', 'SEK - Swedish Krona'),
+    ('NZD', 'NZD - New Zealand Dollar'),
+]
+
 ACCOUNT_CHOICES = [
     ('cash', 'Cash'),
     ('bank', 'Bank'),
@@ -8,14 +21,6 @@ ACCOUNT_CHOICES = [
     ('investment', 'Investment'),
     ('loan', 'Loan'),
     ('other', 'Other'),
-]
-
-CURRENCY_CHOICES = [
-    ('USD', 'USD'),
-    ('HKD', 'HKD'),
-    ('RMB', 'RMB'),
-    ('CAD', 'CAD'),
-    ('CNY', 'CNY'),
 ]
 
 class Account(models.Model):
@@ -34,14 +39,18 @@ class Transaction(models.Model):
         ('expense', 'Expense'),
     ]
     CATEGORY_CHOICES = [
+        ('salary', 'Salary'),
+        ('freelance', 'Freelance'),
+        ('investment', 'Investment'),
         ('food', 'Food'),
-        ('housing', 'Housing'),
         ('transportation', 'Transportation'),
-        ('entertainment', 'Entertainment'),
-        ('shopping', 'Shopping'),
+        ('housing', 'Housing'),
         ('utilities', 'Utilities'),
-        ('healthcare', 'Healthcare'),
+        ('entertainment', 'Entertainment'),
+        ('health', 'Health'),
         ('education', 'Education'),
+        ('shopping', 'Shopping'),
+        ('other', 'Other'),
         ('other_expense', 'Other Expense'),
     ]
 
