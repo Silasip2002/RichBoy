@@ -22,7 +22,11 @@ interface Account {
     currency: string;
 }
 
-const Accounts: React.FC = () => {
+interface AccountsProps {
+    refresh?: number;
+}
+
+const Accounts: React.FC<AccountsProps> = ({ refresh }) => {
     const { token } = useAuth();
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [loading, setLoading] = useState(true);
@@ -59,7 +63,7 @@ const Accounts: React.FC = () => {
 
     useEffect(() => {
         fetchAccounts();
-    }, [token]);
+    }, [token, refresh]);
 
     const handleOpenAddAccountDialog = () => {
         setOpenAddAccountDialog(true);

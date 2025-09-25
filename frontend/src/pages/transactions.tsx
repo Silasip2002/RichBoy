@@ -49,6 +49,8 @@ const TransactionsPage = () => {
     const [account, setAccount] = useState('all');
 
     const [accounts, setAccounts] = useState([]);
+    const [refreshAccounts, setRefreshAccounts] = useState(0);
+
 
     const handleChange = (event: React.SyntheticEvent, newValue: number) => {
         setValue(newValue);
@@ -74,6 +76,11 @@ const TransactionsPage = () => {
             }
         }
     }, [token, page, rowsPerPage, search, time, type, category, account]);
+
+    const handleTransactionAdded = () => {
+        fetchTransactions();
+        setRefreshAccounts(prev => prev + 1);
+    };
 
     useEffect(() => {
         const fetchFilters = async () => {
@@ -139,7 +146,7 @@ const TransactionsPage = () => {
                         />
                     </Box>
                     <Box sx={{ width: { xs: '100%', md: '320px' }, flexShrink: 0 }}>
-                        <AddTransactionCard onTransactionAdded={fetchTransactions} />
+                        <AddTransactionCard onTransactionAdded={handleTransactionAdded} />
                     </Box>
                 </Box>
             </TabPanel>
@@ -147,7 +154,7 @@ const TransactionsPage = () => {
                 <Reports />
             </TabPanel>
             <TabPanel value={value} index={2}>
-                <Accounts />
+                <Accounts refresh={refreshAccounts} />
             </TabPanel>
             <TabPanel value={value} index={3}>
                 <Budgets />

@@ -27,7 +27,24 @@ class TransactionViewSet(viewsets.ModelViewSet):
         return self.request.user.transactions.all()
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        transaction = serializer.save(user=self.request.user)
+        account = transaction.account
+        if transaction.transaction_type == 'income':
+            account.balance += transaction.amount
+        else:
+            account.balance -= transaction.amount
+        account.save()
+
+
+
+    def perform_destroy(self, instance):
+        account = instance.account
+        if instance.transaction_type == 'income':
+            account.balance -= instance.amount
+        else:
+            account.balance += instance.amount
+        account.save()
+        instance.delete()
 
 class AccountViewSet(viewsets.ModelViewSet):
     serializer_class = AccountSerializer
@@ -36,8 +53,17 @@ class AccountViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return self.request.user.accounts.all()
 
+    def get_serializer_context(self):
+        return {'request': self.request}
+
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+
+
+
+
+
 
 class AssetViewSet(viewsets.ModelViewSet):
     serializer_class = AssetSerializer
