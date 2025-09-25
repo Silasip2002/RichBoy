@@ -53,6 +53,30 @@ export const createAccount = async (token: string, accountData: any) => {
     return response.json();
 };
 
+export const updateAccount = async (token: string, accountId: number, accountData: any) => {
+    const response = await fetch(`${API_BASE_URL}/accounts/${accountId}/`, {
+        method: 'PUT',
+        headers: getAuthHeaders(token),
+        body: JSON.stringify(accountData),
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(Object.values(errorData).flat().join(' ') || 'Failed to update account');
+    }
+    return response.json();
+};
+
+export const deleteAccount = async (token: string, accountId: number) => {
+    const response = await fetch(`${API_BASE_URL}/accounts/${accountId}/`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(token),
+    });
+    if (!response.ok) {
+        throw new Error('Failed to delete account');
+    }
+    return response;
+};
+
 export const getAssets = async (token: string) => {
     const response = await fetch(`${API_BASE_URL}/assets/`, {
         headers: getAuthHeaders(token),

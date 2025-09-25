@@ -3,16 +3,19 @@ import { useAuth } from '../contexts/AuthContext';
 import {
     Box, Button, Card, CardContent, Typography, Grid,
     Dialog, DialogTitle, DialogContent, DialogActions,
-    TextField, MenuItem, CircularProgress, Alert
+    TextField, MenuItem, CircularProgress, Alert, IconButton, Menu
 } from '@mui/material';
 import {
     Add as AddIcon,
     AttachMoney as AttachMoneyIcon,
     AccountBalanceWalletOutlined as AccountBalanceWalletOutlinedIcon,
     CreditCard as CreditCardIcon,
+    MoreVert as MoreVertIcon,
+    Edit as EditIcon,
+    Delete as DeleteIcon,
 } from '@mui/icons-material';
 import constants from '../data/constants.json';
-import { getAccounts, createAccount } from '../services/api';
+import { getAccounts, createAccount, updateAccount, deleteAccount } from '../services/api';
 
 interface Account {
     id: number;
@@ -38,6 +41,15 @@ const Accounts: React.FC<AccountsProps> = ({ refresh }) => {
     const [newAccountBalance, setNewAccountBalance] = useState('');
     const [newAccountCurrency, setNewAccountCurrency] = useState(constants.currencies[0].value);
     const [addAccountError, setAddAccountError] = useState<string | null>(null);
+
+    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+    const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+
+    const [openEditAccountDialog, setOpenEditAccountDialog] = useState(false);
+    const [editAccountData, setEditAccountData] = useState<Partial<Account> | null>(null);
+    const [editAccountError, setEditAccountError] = useState<string | null>(null);
+
+    const [openDeleteConfirmDialog, setOpenDeleteConfirmDialog] = useState(false);
 
     const fetchAccounts = async () => {
         if (!token) return;
@@ -97,6 +109,68 @@ const Accounts: React.FC<AccountsProps> = ({ refresh }) => {
         }
     };
 
+    const handleMenuClick = (event: React.MouseEvent<HTMLElement>, account: Account) => {
+        setAnchorEl(event.currentTarget);
+        setSelectedAccount(account);
+    };
+
+    const handleMenuClose = () => {
+        setAnchorEl(null);
+        setSelectedAccount(null);
+    };
+
+    const handleOpenEditDialog = () => {
+        if (selectedAccount) {
+            setEditAccountData({ ...selectedAccount });
+            setOpenEditAccountDialog(true);
+        }
+        handleMenuClose();
+    };
+
+    const handleCloseEditDialog = () => {
+        setOpenEditAccountDialog(false);
+        setEditAccountData(null);
+        setEditAccountError(null);
+    };
+
+    const handleUpdateAccount = async () => {
+        if (!token || !editAccountData || !editAccountData.id) return;
+        setEditAccountError(null);
+        try {
+            await updateAccount(token, editAccountData.id, {
+                name: editAccountData.name,
+                account_type: editAccountData.account_type,
+                balance: editAccountData.balance,
+                currency: editAccountData.currency,
+            });
+            handleCloseEditDialog();
+            fetchAccounts();
+        } catch (err: any) {
+            setEditAccountError(err.message || 'Failed to update account');
+            console.error('Error updating account:', err);
+        }
+    };
+
+    const handleOpenDeleteDialog = () => {
+        setOpenDeleteConfirmDialog(true);
+        handleMenuClose();
+    };
+
+    const handleCloseDeleteDialog = () => {
+        setOpenDeleteConfirmDialog(false);
+    };
+
+    const handleDeleteAccount = async () => {
+        if (!token || !selectedAccount) return;
+        try {
+            await deleteAccount(token, selectedAccount.id);
+            handleCloseDeleteDialog();
+            fetchAccounts();
+        } catch (err: any) {
+            console.error('Error deleting account:', err);
+        }
+    };
+
     if (loading) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
@@ -150,7 +224,16 @@ const Accounts: React.FC<AccountsProps> = ({ refresh }) => {
                                         borderRadius: '8px',
                                         border: account.account_type === 'cash' ? '1px solid #a7d9b5' : account.account_type === 'bank' ? '1px solid #a2d2ff' : '1px solid #d8b2ff',
                                         bgcolor: account.account_type === 'cash' ? '#e6ffe6' : account.account_type === 'bank' ? '#e0f2ff' : '#f5e6ff',
+                                        position: 'relative',
                                     }}>
+                                        <Box sx={{ position: 'absolute', top: 0, right: 0 }}>
+                                            <IconButton
+                                                aria-label="more"
+                                                onClick={(e) => handleMenuClick(e, account)}
+                                            >
+                                                <MoreVertIcon />
+                                            </IconButton>
+                                        </Box>
                                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                                             {account.account_type === 'cash' && (
                                                 <AttachMoneyIcon sx={{ color: '#28a745', mr: 1 }} />
@@ -182,6 +265,21 @@ const Accounts: React.FC<AccountsProps> = ({ refresh }) => {
                     </Grid>
                 </CardContent>
             </Card>
+
+            <Menu
+                anchorEl={anchorEl}
+                open={Boolean(anchorEl)}
+                onClose={handleMenuClose}
+            >
+                <MenuItem onClick={handleOpenEditDialog}>
+                    <EditIcon sx={{ mr: 1 }} />
+                    Edit
+                </MenuItem>
+                <MenuItem onClick={handleOpenDeleteDialog}>
+                    <DeleteIcon sx={{ mr: 1, color: 'error.main' }} />
+                    <Typography color="error">Delete</Typography>
+                </MenuItem>
+            </Menu>
 
             {/* Add Account Dialog */}
             <Dialog open={openAddAccountDialog} onClose={handleCloseAddAccountDialog}>
@@ -241,6 +339,82 @@ const Accounts: React.FC<AccountsProps> = ({ refresh }) => {
                 <DialogActions>
                     <Button onClick={handleCloseAddAccountDialog}>Cancel</Button>
                     <Button onClick={handleCreateAccount}>Create</Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Edit Account Dialog */}
+            <Dialog open={openEditAccountDialog} onClose={handleCloseEditDialog}>
+                <DialogTitle>Edit Account</DialogTitle>
+                <DialogContent>
+                    {editAccountError && <Alert severity="error" sx={{ mb: 2 }}>{editAccountError}</Alert>}
+                    <TextField
+                        autoFocus
+                        margin="dense"
+                        label="Account Name"
+                        type="text"
+                        fullWidth
+                        value={editAccountData?.name || ''}
+                        onChange={(e) => setEditAccountData(prev => prev ? { ...prev, name: e.target.value } : null)}
+                        sx={{ mb: 2 }}
+                    />
+                    <TextField
+                        select
+                        margin="dense"
+                        label="Account Type"
+                        fullWidth
+                        value={editAccountData?.account_type || ''}
+                        onChange={(e) => setEditAccountData(prev => prev ? { ...prev, account_type: e.target.value } : null)}
+                        sx={{ mb: 2 }}
+                    >
+                        {constants.accountTypes.map((option) => (
+                            <MenuItem key={option.value} value={option.value}>
+                                {option.label}
+                            </MenuItem>
+                        ))}
+                    </TextField>
+                    <TextField
+                        select
+                        margin="dense"
+                        label="Currency"
+                        fullWidth
+                        value={editAccountData?.currency || ''}
+                        onChange={(e) => setEditAccountData(prev => prev ? { ...prev, currency: e.target.value } : null)}
+                        sx={{ mb: 2 }}
+                    >
+                        {constants.currencies.map((option) => (
+                            <MenuItem key={option.value} value={option.value}>
+                                {option.label}
+                            </MenuItem>
+                        ))}
+                    </TextField>
+                    <TextField
+                        margin="dense"
+                        label="Balance"
+                        type="number"
+                        fullWidth
+                        value={editAccountData?.balance ?? ''}
+                        onChange={(e) => setEditAccountData(prev => prev ? { ...prev, balance: parseFloat(e.target.value) } : null)}
+                        sx={{ mb: 2 }}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseEditDialog}>Cancel</Button>
+                    <Button onClick={handleUpdateAccount}>Save</Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog
+                open={openDeleteConfirmDialog}
+                onClose={handleCloseDeleteDialog}
+            >
+                <DialogTitle>Confirm Deletion</DialogTitle>
+                <DialogContent>
+                    <Typography>Are you sure you want to delete the account "{selectedAccount?.name}"? This action cannot be undone.</Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseDeleteDialog}>Cancel</Button>
+                    <Button onClick={handleDeleteAccount} color="error">Delete</Button>
                 </DialogActions>
             </Dialog>
         </Box>
