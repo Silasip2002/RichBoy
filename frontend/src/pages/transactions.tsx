@@ -50,7 +50,7 @@ const TransactionsPage = () => {
 
     const [accounts, setAccounts] = useState([]);
     const [refreshAccounts, setRefreshAccounts] = useState(0);
-
+    const [refreshSummary, setRefreshSummary] = useState(0);
 
     const handleChange = (event: React.SyntheticEvent, newValue: number) => {
         setValue(newValue);
@@ -80,6 +80,7 @@ const TransactionsPage = () => {
     const handleTransactionAdded = () => {
         fetchTransactions();
         setRefreshAccounts(prev => prev + 1);
+        setRefreshSummary(prev => prev + 1);
     };
 
     useEffect(() => {
@@ -143,6 +144,7 @@ const TransactionsPage = () => {
                             account={account}
                             setAccount={setAccount}
                             accounts={accounts}
+                            refreshSummary={refreshSummary}
                         />
                     </Box>
                     <Box sx={{ width: { xs: '100%', md: '320px' }, flexShrink: 0 }}>

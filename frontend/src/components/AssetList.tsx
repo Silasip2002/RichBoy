@@ -28,6 +28,16 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
   const [searchTerm, setSearchTerm] = React.useState('');
   const [filteredAssets, setFilteredAssets] = React.useState(assets);
 
+  // Helper function for currency formatting
+  const formatCurrency = (value: number, currency: string) => {
+      return new Intl.NumberFormat('en-US', { // 'en-US' for standard US formatting, can be dynamic
+          style: 'currency',
+          currency: currency,
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+      }).format(value);
+  };
+
   React.useEffect(() => {
     setFilteredAssets(
       assets.filter(asset =>
@@ -251,15 +261,21 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
                 const avgCost = asset.quantity > 0 ? asset.cost / asset.quantity : 0;
                 const change = avgCost > 0 ? ((asset.market_price - avgCost) / avgCost) * 100 : 0;
 
+                // Find the account for the current asset to get its currency
+                const assetAccount = accounts.find(acc => acc.id === asset.account);
+                const assetCurrency = assetAccount ? assetAccount.currency : 'USD'; // Default to USD if account not found
+
                 return (
                     <TableRow key={index}>
                         <TableCell>{asset.name.split(' - ')[0]}</TableCell>
                         <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <Typography variant="body2" component="span">{Number(asset.market_price).toFixed(2)}</Typography>
+                                {/* Apply formatting to market_price */}
+                                <Typography variant="body2" component="span">{formatCurrency(Number(asset.market_price), assetCurrency)}</Typography>
                                 <Typography variant="body2" component="span" color="text.secondary">/</Typography>
                                 <Typography variant="caption" component="span" color="text.secondary">
-                                    {asset.quantity > 0 ? (asset.cost / asset.quantity).toFixed(2) : '0.00'}
+                                    {/* Apply formatting to average cost */}
+                                    {asset.quantity > 0 ? formatCurrency(avgCost, assetCurrency) : formatCurrency(0, assetCurrency)}
                                 </Typography>
                             </Box>
                         </TableCell>
@@ -277,7 +293,8 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
                             })()}
                         </TableCell>
                         <TableCell>{Number(asset.quantity).toFixed(2)}</TableCell>
-                        <TableCell>{!isNaN(marketValue) ? Number(marketValue).toFixed(2) : '0.00'}</TableCell>
+                        {/* Apply formatting to marketValue */}
+                        <TableCell>{!isNaN(marketValue) ? formatCurrency(marketValue, assetCurrency) : formatCurrency(0, assetCurrency)}</TableCell>
                         <TableCell>{getTypeChip(asset.asset_type)}</TableCell>
                         <TableCell>
                             <IconButton size="small" aria-label="edit" onClick={() => handleEditClick(asset)}>

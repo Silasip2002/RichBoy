@@ -7,12 +7,44 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework.views import APIView
 
+import subprocess # Import subprocess
+from datetime import datetime, timedelta # Import datetime and timedelta
+from django.utils import timezone # Import timezone
+from transactions.models import ExchangeRate # Import ExchangeRate model
+
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         data = super().validate(attrs)
         serializer = UserSerializerForToken(self.user).data
         for k, v in serializer.items():
             data[k] = v
+
+        # --- Currency Rate Update Logic ---
+        # Check if rates need to be updated
+        last_update_threshold = timezone.now() - timedelta(hours=1) # Rates older than 1 hour are stale
+
+        # Check if any ExchangeRate object exists and its last_updated is older than the threshold
+        # Or if no ExchangeRate objects exist at all
+        rates_stale = True
+        try:
+            latest_rate = ExchangeRate.objects.latest('last_updated')
+            if latest_rate.last_updated > last_update_threshold:
+                rates_stale = False
+        except ExchangeRate.DoesNotExist:
+            rates_stale = True # No rates exist, so they are definitely stale
+
+        if rates_stale:
+            # Trigger the update_rates management command in a non-blocking way
+            # Use sys.executable to ensure the correct python interpreter is used
+            # Use the absolute path to manage.py
+            manage_py_path = r'C:\Users\faith\OneDrive\Desktop\IT Proejcts Home\RichBoy\backend\manage.py'
+            subprocess.Popen([
+                'python', # Use 'python' directly, assuming it's in PATH
+                manage_py_path,
+                'update_rates'
+            ])
+            print("Triggered update_rates command in background.") # For logging/debugging
+
         return data
 
 class MyTokenObtainPairView(TokenObtainPairView):
@@ -33,3 +65,12 @@ class UserProfileView(APIView):
         profile, created = UserProfile.objects.get_or_create(user=user)
         serializer = UserProfileSerializer(profile)
         return Response(serializer.data)
+
+    def put(self, request, *args, **kwargs):
+        user = request.user
+        profile, created = UserProfile.objects.get_or_create(user=user)
+        serializer = UserProfileSerializer(profile, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

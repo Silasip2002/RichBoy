@@ -19,7 +19,7 @@ import {
     Select,
     MenuItem,
 } from '@mui/material';
-import { getAllTransactions } from '../services/api';
+import { getAllTransactions, getTransactionSummary } from '../services/api';
 
 interface Transaction {
     id: number;
@@ -50,6 +50,7 @@ interface TransactionHistoryProps {
     account: string;
     setAccount: (account: string) => void;
     accounts: { id: number; name: string }[];
+    refreshSummary: number;
 }
 
 const TransactionHistory: React.FC<TransactionHistoryProps> = ({
@@ -70,42 +71,41 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
     account,
     setAccount,
     accounts,
+    refreshSummary,
 }) => {
     const [totalIncome, setTotalIncome] = useState(0);
     const [totalExpense, setTotalExpense] = useState(0);
     const [netBalance, setNetBalance] = useState(0);
+    const [summaryCurrency, setSummaryCurrency] = useState('USD');
     const { token } = useAuth();
 
+    // Helper function for currency formatting
+    const formatCurrency = (value: number, currency: string) => {
+        return new Intl.NumberFormat('en-US', { // 'en-US' for standard US formatting, can be dynamic
+            style: 'currency',
+            currency: currency,
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        }).format(value);
+    };
+
     useEffect(() => {
-        const fetchAllTransactions = async () => {
+        const fetchSummary = async () => {
             if (token) {
                 try {
-                    const allTransactions = await getAllTransactions(token);
-                    const { totalIncome, totalExpense, netBalance } = allTransactions.reduce(
-                        (acc, transaction) => {
-                            const amount = parseFloat(transaction.amount);
-                            if (transaction.transaction_type === 'income') {
-                                acc.totalIncome += amount;
-                            } else if (transaction.transaction_type === 'expense') {
-                                acc.totalExpense += amount;
-                            }
-                            acc.netBalance = acc.totalIncome - acc.totalExpense;
-                            return acc;
-                        },
-                        { totalIncome: 0, totalExpense: 0, netBalance: 0 }
-                    );
-
-                    setTotalIncome(totalIncome);
-                    setTotalExpense(totalExpense);
-                    setNetBalance(netBalance);
+                    const summary = await getTransactionSummary(token);
+                    setTotalIncome(summary.total_income);
+                    setTotalExpense(summary.total_expense);
+                    setNetBalance(summary.net_balance);
+                    setSummaryCurrency(summary.preferred_currency);
                 } catch (error) {
-                    console.error('Failed to fetch all transactions', error);
+                    console.error('Failed to fetch transaction summary', error);
                 }
             }
         };
 
-        fetchAllTransactions();
-    }, [token]);
+        fetchSummary();
+    }, [token, refreshSummary]);
 
     const allCategories = [...constants.transactionCategories.income, ...constants.transactionCategories.expense];
 
@@ -162,15 +162,15 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
                 <Box sx={{ display: 'flex', justifyContent: 'space-around', my: 2 }}>
                     <Box sx={{ p: 2, borderRadius: 2, bgcolor: '#d4edda', color: '#155724', textAlign: 'center' }}>
                         <Typography variant="h6">Total Income</Typography>
-                        <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{totalIncome.toFixed(2)}</Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{formatCurrency(totalIncome, summaryCurrency)}</Typography>
                     </Box>
                     <Box sx={{ p: 2, borderRadius: 2, bgcolor: '#f8d7da', color: '#721c24', textAlign: 'center' }}>
                         <Typography variant="h6">Total Expense</Typography>
-                        <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{totalExpense.toFixed(2)}</Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{formatCurrency(totalExpense, summaryCurrency)}</Typography>
                     </Box>
                     <Box sx={{ p: 2, borderRadius: 2, bgcolor: netBalance >= 0 ? '#d4edda' : '#f8d7da', color: netBalance >= 0 ? '#155724' : '#721c24', textAlign: 'center' }}>
                         <Typography variant="h6">Net Balance</Typography>
-                        <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{netBalance.toFixed(2)}</Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{formatCurrency(netBalance, summaryCurrency)}</Typography>
                     </Box>
                 </Box>
                 <TableContainer sx={{ maxHeight: 440, overflowY: 'auto' }}>
@@ -185,20 +185,23 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {transactions.map((transaction) => (
-                                <TableRow
-                                    key={transaction.id}
-                                    sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
-                                >
-                                    <TableCell component="th" scope="row">
-                                        {transaction.date}
-                                    </TableCell>
-                                    <TableCell>{transaction.description}</TableCell>
-                                    <TableCell>{transaction.category}</TableCell>
-                                    <TableCell>{accounts.find(acc => acc.id === parseInt(transaction.account))?.name || transaction.account}</TableCell>
-                                    <TableCell align="right">{`${transaction.amount} ${transaction.currency}`}</TableCell>
-                                </TableRow>
-                            ))}
+                            {transactions
+                                .slice()
+                                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                                .map((transaction) => (
+                                    <TableRow
+                                        key={transaction.id}
+                                        sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                                    >
+                                        <TableCell component="th" scope="row">
+                                            {transaction.date}
+                                        </TableCell>
+                                        <TableCell>{transaction.description}</TableCell>
+                                        <TableCell>{transaction.category}</TableCell>
+                                        <TableCell>{accounts.find(acc => acc.id === parseInt(transaction.account))?.name || transaction.account}</TableCell>
+                                        <TableCell align="right">{`${transaction.amount} ${transaction.currency}`}</TableCell>
+                                    </TableRow>
+                                ))}
                         </TableBody>
                     </Table>
                 </TableContainer>

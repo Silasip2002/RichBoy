@@ -186,6 +186,19 @@ export const getUserProfile = async (token: string) => {
     return response.json();
 };
 
+export const updateUserProfile = async (token: string, profileData: any) => {
+    const response = await fetch(`${API_BASE_URL}/users/profile/`, {
+        method: 'PUT',
+        headers: getAuthHeaders(token),
+        body: JSON.stringify(profileData),
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(Object.values(errorData).flat().join(' ') || 'Failed to update user profile');
+    }
+    return response.json();
+};
+
 export const loginUser = async (credentials: any) => {
     const response = await fetch(`${API_BASE_URL}/users/login/`, {
         method: 'POST',
@@ -233,6 +246,16 @@ export const getAssetAllocation = async (token: string) => {
     });
     if (!response.ok) {
         throw new Error('Failed to fetch asset allocation');
+    }
+    return response.json();
+};
+
+export const getTransactionSummary = async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/get_transaction_summary/`, {
+        headers: getAuthHeaders(token),
+    });
+    if (!response.ok) {
+        throw new Error('Failed to fetch transaction summary');
     }
     return response.json();
 };

@@ -15,7 +15,7 @@ import {
     Delete as DeleteIcon,
 } from '@mui/icons-material';
 import constants from '../data/constants.json';
-import { getAccounts, createAccount, updateAccount, deleteAccount } from '../services/api';
+import { getAccounts, createAccount, updateAccount, deleteAccount, getUserProfile, updateUserProfile } from '../services/api'; // Added getUserProfile, updateUserProfile
 
 interface Account {
     id: number;
@@ -51,6 +51,12 @@ const Accounts: React.FC<AccountsProps> = ({ refresh }) => {
 
     const [openDeleteConfirmDialog, setOpenDeleteConfirmDialog] = useState(false);
 
+    // State for preferred currency
+    const [preferredCurrency, setPreferredCurrency] = useState('USD');
+    const [initialPreferredCurrency, setInitialPreferredCurrency] = useState('USD'); // To check if changed
+    const [preferredCurrencyError, setPreferredCurrencyError] = useState<string | null>(null);
+
+
     const fetchAccounts = async () => {
         if (!token) return;
         setLoading(true);
@@ -73,8 +79,23 @@ const Accounts: React.FC<AccountsProps> = ({ refresh }) => {
         }
     };
 
+    const fetchUserProfile = async () => {
+        if (!token) return;
+        try {
+            const profile = await getUserProfile(token);
+            if (profile && profile.preferred_currency) {
+                setPreferredCurrency(profile.preferred_currency);
+                setInitialPreferredCurrency(profile.preferred_currency);
+            }
+        } catch (err: any) {
+            console.error('Error fetching user profile:', err);
+            // Handle error, maybe set a default or show a message
+        }
+    };
+
     useEffect(() => {
         fetchAccounts();
+        fetchUserProfile(); // Fetch user profile on mount
     }, [token, refresh]);
 
     const handleOpenAddAccountDialog = () => {
@@ -171,6 +192,19 @@ const Accounts: React.FC<AccountsProps> = ({ refresh }) => {
         }
     };
 
+    const handleSavePreferredCurrency = async () => {
+        if (!token) return;
+        setPreferredCurrencyError(null);
+        try {
+            await updateUserProfile(token, { preferred_currency: preferredCurrency });
+            setInitialPreferredCurrency(preferredCurrency); // Update initial to reflect saved state
+            alert('Preferred currency updated successfully!');
+        } catch (err: any) {
+            setPreferredCurrencyError(err.message || 'Failed to update preferred currency');
+            console.error('Error updating preferred currency:', err);
+        }
+    };
+
     if (loading) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
@@ -209,6 +243,35 @@ const Accounts: React.FC<AccountsProps> = ({ refresh }) => {
                             Add Account
                         </Button>
                     </Box>
+
+                    {/* Preferred Currency Setting */}
+                    <Box sx={{ mb: 3, p: 2, border: '1px solid #ddd', borderRadius: '8px', bgcolor: '#f9f9f9' }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 'medium', mb: 1 }}>Display Currency</Typography>
+                        {preferredCurrencyError && <Alert severity="error" sx={{ mb: 2 }}>{preferredCurrencyError}</Alert>}
+                        <TextField
+                            select
+                            label="Preferred Display Currency"
+                            fullWidth
+                            value={preferredCurrency}
+                            onChange={(e) => setPreferredCurrency(e.target.value)}
+                            sx={{ mb: 1 }}
+                        >
+                            {constants.currencies.map((option) => (
+                                <MenuItem key={option.value} value={option.value}>
+                                    {option.label}
+                                </MenuItem>
+                            ))}
+                        </TextField>
+                        <Button
+                            variant="contained"
+                            onClick={handleSavePreferredCurrency}
+                            disabled={preferredCurrency === initialPreferredCurrency} // Disable if no change
+                            sx={{ textTransform: 'none', borderRadius: '8px' }}
+                        >
+                            Save Display Currency
+                        </Button>
+                    </Box>
+
                     <Grid container spacing={2}>
                         {accounts.length === 0 ? (
                             <Grid item xs={12}>
