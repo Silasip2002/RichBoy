@@ -92,6 +92,7 @@ export const getAssets = async (token: string) => {
     if (!response.ok) {
         throw new Error('Failed to fetch assets');
     }
+    return response.json();
 }
 export const getAccountTransactions = async (token: string, id: string) => {
     const response = await fetch(`${API_BASE_URL}/transactions/?account=${id}`, {

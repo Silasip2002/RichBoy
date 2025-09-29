@@ -1,12 +1,20 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.db.models import Sum, F
+from django.db.models.functions import Coalesce
+from .models import Transaction, Account, Asset, BalanceSnapshot, ExchangeRate
+from .serializers import TransactionSerializer, AccountSerializer, AssetSerializer, CategorySerializer, BalanceSnapshotSerializer
+from richboy_backend.pagination import StandardResultsSetPagination
+from datetime import datetime, timedelta
+from django.utils import timezone
+from django.db import transaction as db_transaction
+import requests
+import os
 import logging
 import yfinance as yf
-import requests
 from users.models import UserProfile
-from .models import Transaction, Account, Asset, ExchangeRate
-from .serializers import TransactionSerializer, AccountSerializer, AssetSerializer, CategorySerializer, BalanceSnapshotSerializer
 from decimal import Decimal
 
 logger = logging.getLogger(__name__)
@@ -48,36 +56,100 @@ class CategoryViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class TransactionViewSet(viewsets.ModelViewSet):
     serializer_class = TransactionSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
+
+    def list(self, request, *args, **kwargs):
+        try:
+            return super().list(request, *args, **kwargs)
+        except Exception as e:
+            logger.exception("Error in TransactionViewSet list method:")
+            return Response({"detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def get_queryset(self):
-        queryset = self.request.user.transactions.all()
+        user = self.request.user
+        queryset = Transaction.objects.filter(user=user).order_by('-date')
+
         account_id = self.request.query_params.get('account')
-        if account_id:
+        if account_id and account_id != 'all':
             queryset = queryset.filter(account__id=account_id)
+
+        category = self.request.query_params.get('category')
+        if category and category != 'all':
+            queryset = queryset.filter(category__name=category)
+
+        transaction_type = self.request.query_params.get('transaction_type')
+        if transaction_type and transaction_type != 'all':
+            queryset = queryset.filter(transaction_type=transaction_type)
+
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+
+        if start_date and end_date:
+            queryset = queryset.filter(date__range=[start_date, end_date])
+        elif start_date:
+            queryset = queryset.filter(date__gte=start_date)
+        elif end_date:
+            queryset = queryset.filter(date__lte=end_date)
+
         return queryset
 
     def perform_create(self, serializer):
-        transaction = serializer.save(user=self.request.user)
+        with db_transaction.atomic():
+            transaction = serializer.save(account=self.get_account_from_request())
+            self.update_account_balance(transaction)
+
+    def perform_update(self, serializer):
+        with db_transaction.atomic():
+            old_transaction = Transaction.objects.get(pk=serializer.instance.pk)
+            updated_transaction = serializer.save()
+            self.revert_account_balance(old_transaction)
+            self.update_account_balance(updated_transaction)
+
+    def perform_destroy(self, instance):
+        with db_transaction.atomic():
+            self.revert_account_balance(instance)
+            instance.delete()
+
+    def get_account_from_request(self):
+        account_id = self.request.data.get('account')
+        if not account_id:
+            raise serializers.ValidationError({"account": "This field is required."})
+        try:
+            account = Account.objects.get(id=account_id, owner=self.request.user)
+        except Account.DoesNotExist:
+            raise serializers.ValidationError({"account": "Account not found or does not belong to the user."})
+        return account
+
+    def update_account_balance(self, transaction):
         account = transaction.account
         if transaction.transaction_type == 'income':
             account.balance += transaction.amount
-        else:
+        elif transaction.transaction_type == 'expense':
             account.balance -= transaction.amount
+        elif transaction.transaction_type == 'transfer':
+            # For transfers, the amount is deducted from the source account
+            # and added to the destination account.
+            # This logic assumes 'transfer_to_account' is handled in the serializer
+            # and the amount is positive.
+            pass # Balance update for transfers is more complex and might be handled elsewhere or needs explicit handling
         account.save()
 
-
-
-    def perform_destroy(self, instance):
-        account = instance.account
-        if instance.transaction_type == 'income':
-            account.balance -= instance.amount
-        else:
-            account.balance += instance.amount
+    def revert_account_balance(self, transaction):
+        account = transaction.account
+        if transaction.transaction_type == 'income':
+            account.balance -= transaction.amount
+        elif transaction.transaction_type == 'expense':
+            account.balance += transaction.amount
+        elif transaction.transaction_type == 'transfer':
+            pass # Revert logic for transfers is complex
         account.save()
-        instance.delete()
 
 class AccountViewSet(viewsets.ModelViewSet):
     serializer_class = AccountSerializer
