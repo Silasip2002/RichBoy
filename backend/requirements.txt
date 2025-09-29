@@ -8,3 +8,4 @@ djangorestframework-simplejwt
 requests
 yfinance
 yahoofinancials
+django-extensions

@@ -20,6 +20,8 @@ ACCOUNT_CHOICES = [
     ('bank', 'Bank'),
     ('credit_card', 'Credit Card'),
     ('investment', 'Investment'),
+    ('crypto', 'Crypto'),
+    ('bond', 'Bond'),
     ('loan', 'Loan'),
     ('other', 'Other'),
 ]
@@ -98,3 +100,16 @@ class Asset(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.name}"
+
+class BalanceSnapshot(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='balance_snapshots')
+    account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='balance_snapshots')
+    date = models.DateField()
+    balance = models.DecimalField(max_digits=15, decimal_places=2)
+
+    class Meta:
+        ordering = ['-date']
+        unique_together = ('account', 'date')
+
+    def __str__(self):
+        return f'{self.account.name} - {self.date} - {self.balance}'

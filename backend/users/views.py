@@ -11,6 +11,8 @@ import subprocess # Import subprocess
 from datetime import datetime, timedelta # Import datetime and timedelta
 from django.utils import timezone # Import timezone
 from transactions.models import ExchangeRate # Import ExchangeRate model
+import os # Import os
+import sys # Import sys
 
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
@@ -37,9 +39,9 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
             # Trigger the update_rates management command in a non-blocking way
             # Use sys.executable to ensure the correct python interpreter is used
             # Use the absolute path to manage.py
-            manage_py_path = r'C:\Users\faith\OneDrive\Desktop\IT Proejcts Home\RichBoy\backend\manage.py'
+            manage_py_path = os.path.join(os.getcwd(), 'backend', 'manage.py')
             subprocess.Popen([
-                'python', # Use 'python' directly, assuming it's in PATH
+                sys.executable, # Use sys.executable to ensure the correct python interpreter is used
                 manage_py_path,
                 'update_rates'
             ])
