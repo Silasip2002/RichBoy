@@ -27,24 +27,35 @@ def convert_currency(amount, from_currency, to_currency):
         rate_obj = ExchangeRate.objects.get(base_currency=from_currency, target_currency=to_currency)
         return amount * rate_obj.rate
     except ExchangeRate.DoesNotExist:
-        # If direct conversion not found, try via USD (or another common base)
-        # This assumes all rates are stored relative to USD
-        if from_currency != 'USD' and to_currency != 'USD':
+        try:
+            # Try inverse conversion
+            rate_obj = ExchangeRate.objects.get(base_currency=to_currency, target_currency=from_currency)
+            return amount / rate_obj.rate
+        except ExchangeRate.DoesNotExist:
+            # If not in DB, fetch from yfinance
             try:
-                # Convert from_currency to USD
-                rate_to_usd = ExchangeRate.objects.get(base_currency=from_currency, target_currency='USD').rate
-                amount_in_usd = amount * rate_to_usd
-                # Convert USD to to_currency
-                rate_from_usd = ExchangeRate.objects.get(base_currency='USD', target_currency=to_currency).rate
-                return amount_in_usd * rate_from_usd
-            except ExchangeRate.DoesNotExist:
-                # Handle cases where intermediate rates are missing
-                return None # Or raise an error, or return original amount
-        else:
-            return None # Or raise an error, or return original amount
-    except Exception as e:
-        logger.error(f"Error during currency conversion from {from_currency} to {to_currency}: {e}")
-        return None
+                ticker_symbol = f"{from_currency}{to_currency}=X"
+                ticker = yf.Ticker(ticker_symbol)
+                hist = ticker.history(period="1d")
+                if not hist.empty:
+                    rate = Decimal(hist['Close'].iloc[-1])
+                    # Save for next time
+                    ExchangeRate.objects.create(base_currency=from_currency, target_currency=to_currency, rate=rate)
+                    return amount * rate
+                else:
+                    # Try inverse ticker
+                    ticker_symbol = f"{to_currency}{from_currency}=X"
+                    ticker = yf.Ticker(ticker_symbol)
+                    hist = ticker.history(period="1d")
+                    if not hist.empty:
+                        rate = Decimal(1) / Decimal(hist['Close'].iloc[-1])
+                        ExchangeRate.objects.create(base_currency=from_currency, target_currency=to_currency, rate=rate)
+                        return amount * rate
+            except Exception as e:
+                logger.error(f"yfinance fetch failed for {from_currency}-{to_currency}: {e}")
+
+    logger.warning(f"Failed to get rate for {from_currency} to {to_currency}")
+    return None
 
 
 class CategoryViewSet(viewsets.ViewSet):
@@ -304,44 +315,25 @@ def get_portfolio_summary(request):
     user_profile = UserProfile.objects.get(user=user) # Get user profile
     preferred_currency = user_profile.preferred_currency # Get preferred currency
 
-    assets = Asset.objects.filter(user=user)
     accounts = Account.objects.filter(user=user)
 
     total_portfolio_value = Decimal('0.0')
-    total_cost = Decimal('0.0')
-
-    for asset in assets:
-        # Convert asset market_value to preferred_currency
-        converted_market_value = convert_currency(asset.market_value, asset.account.currency, preferred_currency)
-        if converted_market_value is not None:
-            total_portfolio_value += converted_market_value
-        else:
-            logger.warning(f"Could not convert asset market value for asset {asset.id} from {asset.account.currency} to {preferred_currency}")
-            # Decide how to handle unconvertible assets: skip, use original, or error
-
-        # Convert asset cost to preferred_currency
-        converted_cost = convert_currency(asset.cost, asset.account.currency, preferred_currency)
-        if converted_cost is not None:
-            total_cost += converted_cost
-        else:
-            logger.warning(f"Could not convert asset cost for asset {asset.id} from {asset.account.currency} to {preferred_currency}")
-            # Decide how to handle unconvertible assets: skip, use original, or error
-
-    todays_change = Decimal('0.0')
-    if total_cost > 0:
-        todays_change = ((total_portfolio_value - total_cost) / total_cost) * 100
-
     cash_balance = Decimal('0.0')
-    for account in accounts:
-        if account.account_type == 'cash':
-            # Convert cash account balance to preferred_currency
-            converted_balance = convert_currency(account.balance, account.currency, preferred_currency)
-            if converted_balance is not None:
-                cash_balance += converted_balance
-            else:
-                logger.warning(f"Could not convert cash balance for account {account.id} from {account.currency} to {preferred_currency}")
-                # Decide how to handle unconvertible cash balances: skip, use original, or error
 
+    for account in accounts:
+        converted_balance = convert_currency(account.balance, account.currency, preferred_currency)
+        if converted_balance is not None:
+            logger.info(f"Account: {account.name}, Original: {account.balance} {account.currency}, Converted: {converted_balance} {preferred_currency}")
+            total_portfolio_value += converted_balance
+            if account.account_type == 'cash':
+                cash_balance += converted_balance
+        else:
+            logger.warning(f"Could not convert account balance for account {account.id} from {account.currency} to {preferred_currency}")
+
+    # For now, todays_change is set to 0 as its calculation was based on assets
+    todays_change = Decimal('0.0')
+
+    logger.info(f"Total portfolio value for user {user.id}: {total_portfolio_value}")
 
     return Response({
         'total_portfolio_value': total_portfolio_value,

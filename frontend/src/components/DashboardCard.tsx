@@ -14,9 +14,22 @@ const DashboardCard: React.FC = () => {
       if (!token) return;
       try {
         const data = await getPortfolioSummary(token);
-        setTotalPortfolioValue(`$${data.total_portfolio_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
-        setTodaysChange(`${data.todays_change >= 0 ? '+' : ''}$${Math.abs(data.todays_change).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${data.todays_change.toFixed(2)}%)`);
-        setCashBalance(`$${data.cash_balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+        console.log('Portfolio Summary Data:', data);
+        const currency = data.preferred_currency;
+
+        const formattedTotalValue = data.total_portfolio_value.toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+        setTotalPortfolioValue(`${currency} ${formattedTotalValue}`);
+
+        setTodaysChange(`${data.todays_change >= 0 ? '+' : ''}${data.todays_change.toFixed(2)}%`);
+
+        const formattedCashBalance = data.cash_balance.toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+        setCashBalance(`${currency} ${formattedCashBalance}`);
       } catch (error) {
         console.error('Failed to fetch portfolio summary', error);
       }
