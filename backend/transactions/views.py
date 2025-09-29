@@ -4,8 +4,8 @@ from rest_framework.response import Response
 import requests
 import logging
 from django.conf import settings
-from .models import Transaction, Account, Asset
-from .serializers import TransactionSerializer, AccountSerializer, AssetSerializer, CategorySerializer
+from .models import Transaction, Account, Asset, BalanceSnapshot
+from .serializers import TransactionSerializer, AccountSerializer, AssetSerializer, CategorySerializer, BalanceSnapshotSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,25 @@ class AccountViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+class BalanceSnapshotViewSet(viewsets.ModelViewSet):
+    serializer_class = BalanceSnapshotSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return self.request.user.balance_snapshots.all()
+
+    def perform_create(self, serializer):
+        snapshot = serializer.save(user=self.request.user)
+        account = snapshot.account
+        account.balance = snapshot.balance
+        account.save()
+
+    def perform_update(self, serializer):
+        snapshot = serializer.save()
+        account = snapshot.account
+        account.balance = snapshot.balance
+        account.save()
 
 class AssetViewSet(viewsets.ModelViewSet):
     serializer_class = AssetSerializer

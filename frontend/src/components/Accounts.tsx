@@ -3,16 +3,22 @@ import { useAuth } from '../contexts/AuthContext';
 import {
     Box, Button, Card, CardContent, Typography, Grid,
     Dialog, DialogTitle, DialogContent, DialogActions,
-    TextField, MenuItem, CircularProgress, Alert
+    TextField, MenuItem, CircularProgress, Alert, List, ListItem, ListItemText, Divider, IconButton, FormControl, Select, SelectChangeEvent
 } from '@mui/material';
 import {
     Add as AddIcon,
+    Close as CloseIcon,
     AttachMoney as AttachMoneyIcon,
     AccountBalanceWalletOutlined as AccountBalanceWalletOutlinedIcon,
     CreditCard as CreditCardIcon,
+    TrendingUp as TrendingUpIcon,
+    MonetizationOn as MonetizationOnIcon,
+    AccountBalance as AccountBalanceIcon,
+    CreditScore as CreditScoreIcon,
 } from '@mui/icons-material';
+import { LineChart } from '@mui/x-charts/LineChart';
 import constants from '../data/constants.json';
-import { getAccounts, createAccount } from '../services/api';
+import { getAccounts, createAccount, getAccountDetails, getAccountTransactions, createBalanceSnapshot, getBalanceSnapshots, updateBalanceSnapshot } from '../services/api';
 
 interface Account {
     id: number;
@@ -20,6 +26,26 @@ interface Account {
     account_type: string;
     balance: number;
     currency: string;
+}
+
+interface Transaction {
+    id: number;
+    date: string;
+    description: string;
+    amount: number;
+    category: string;
+}
+
+interface BalanceSnapshot {
+    id: number;
+    date: string;
+    balance: number;
+}
+
+interface Activity {
+    date: string;
+    type: 'transaction' | 'snapshot';
+    data: Transaction | BalanceSnapshot;
 }
 
 const Accounts: React.FC = () => {
@@ -34,6 +60,20 @@ const Accounts: React.FC = () => {
     const [newAccountBalance, setNewAccountBalance] = useState('');
     const [newAccountCurrency, setNewAccountCurrency] = useState(constants.currencies[0].value);
     const [addAccountError, setAddAccountError] = useState<string | null>(null);
+
+    const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+    const [activities, setActivities] = useState<Activity[]>([]);
+    const [balanceSnapshots, setBalanceSnapshots] = useState<BalanceSnapshot[]>([]);
+    const [detailsLoading, setDetailsLoading] = useState(false);
+    const [detailsError, setDetailsError] = useState<string | null>(null);
+    const [openDetailsDialog, setOpenDetailsDialog] = useState(false);
+
+    const [openRecordBalanceDialog, setOpenRecordBalanceDialog] = useState(false);
+    const [recordBalanceAmount, setRecordBalanceAmount] = useState('');
+    const [recordBalanceDate, setRecordBalanceDate] = useState(new Date().toISOString().split('T')[0]);
+    const [recordBalanceError, setRecordBalanceError] = useState<string | null>(null);
+
+    const [timeFrame, setTimeFrame] = useState('all');
 
     const fetchAccounts = async () => {
         if (!token) return;
@@ -57,9 +97,48 @@ const Accounts: React.FC = () => {
         }
     };
 
+    const fetchAccountDetailsAndActivities = async () => {
+        if (!token || !selectedAccount) return;
+
+        setDetailsLoading(true);
+        setDetailsError(null);
+
+        try {
+            const accountDetails = await getAccountDetails(token, selectedAccount.id.toString());
+            setSelectedAccount({ ...accountDetails, balance: parseFloat(accountDetails.balance) });
+
+            const transactionData = await getAccountTransactions(token, selectedAccount.id.toString());
+            const transactions = Array.isArray(transactionData.results) ? transactionData.results : (Array.isArray(transactionData) ? transactionData : []);
+
+            const snapshotData = await getBalanceSnapshots(token, selectedAccount.id.toString());
+            const snapshots = Array.isArray(snapshotData.results) ? snapshotData.results : (Array.isArray(snapshotData) ? snapshotData : []);
+            setBalanceSnapshots(snapshots.map((s: any) => ({...s, balance: parseFloat(s.balance)})));
+
+            const combinedActivities: Activity[] = [
+                ...transactions.map((t: any) => ({ date: t.date, type: 'transaction' as const, data: { ...t, amount: parseFloat(t.amount) }})),
+                ...snapshots.map((s: any) => ({ date: s.date, type: 'snapshot' as const, data: { ...s, balance: parseFloat(s.balance) }}))
+            ];
+
+            combinedActivities.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+            setActivities(combinedActivities);
+
+        } catch (err: any) {
+            setDetailsError(err.message || 'Failed to fetch account data');
+        } finally {
+            setDetailsLoading(false);
+        }
+    };
+
     useEffect(() => {
         fetchAccounts();
     }, [token]);
+
+    useEffect(() => {
+        if (openDetailsDialog) {
+            fetchAccountDetailsAndActivities();
+        }
+    }, [selectedAccount?.id, openDetailsDialog, token]);
 
     const handleOpenAddAccountDialog = () => {
         setOpenAddAccountDialog(true);
@@ -92,6 +171,77 @@ const Accounts: React.FC = () => {
             console.error('Error creating account:', err);
         }
     };
+
+    const handleCardClick = (account: Account) => {
+        setSelectedAccount(account);
+        setOpenDetailsDialog(true);
+    };
+
+    const handleCloseDetailsDialog = () => {
+        setOpenDetailsDialog(false);
+        setSelectedAccount(null);
+        setActivities([]);
+        setDetailsError(null);
+    };
+
+    const handleRecordBalance = async () => {
+        if (!token || !selectedAccount || !recordBalanceAmount) return;
+
+        setRecordBalanceError(null);
+        try {
+            const existingSnapshot = balanceSnapshots.find(s => s.date === recordBalanceDate);
+
+            if (existingSnapshot) {
+                await updateBalanceSnapshot(token, existingSnapshot.id.toString(), {
+                    account: selectedAccount.id,
+                    balance: parseFloat(recordBalanceAmount),
+                    date: recordBalanceDate,
+                });
+            } else {
+                await createBalanceSnapshot(token, {
+                    account: selectedAccount.id,
+                    balance: parseFloat(recordBalanceAmount),
+                    date: recordBalanceDate,
+                });
+            }
+
+            setOpenRecordBalanceDialog(false);
+            setRecordBalanceAmount('');
+            // Refresh data
+            fetchAccounts();
+            fetchAccountDetailsAndActivities();
+        } catch (err: any) {
+            setRecordBalanceError(err.message || 'Failed to record balance');
+        }
+    };
+
+    const handleTimeFrameChange = (event: SelectChangeEvent) => {
+        setTimeFrame(event.target.value);
+    };
+
+    const filteredSnapshots = balanceSnapshots.filter(snapshot => {
+        if (timeFrame === 'all') {
+            return true;
+        }
+        const snapshotDate = new Date(snapshot.date);
+        const now = new Date();
+        let daysToSubtract = 0;
+        switch (timeFrame) {
+            case '1w':
+                daysToSubtract = 7;
+                break;
+            case '1m':
+                daysToSubtract = 30;
+                break;
+            case '5y':
+                daysToSubtract = 5 * 365;
+                break;
+            default:
+                return true;
+        }
+        const fromDate = new Date(now.setDate(now.getDate() - daysToSubtract));
+        return snapshotDate >= fromDate;
+    });
 
     if (loading) {
         return (
@@ -141,12 +291,20 @@ const Accounts: React.FC = () => {
                         ) : (
                             accounts.map((account) => (
                                 <Grid item xs={12} sm={6} md={4} key={account.id}>
-                                    <Card sx={{
-                                        p: 2,
-                                        borderRadius: '8px',
-                                        border: account.account_type === 'cash' ? '1px solid #a7d9b5' : account.account_type === 'bank' ? '1px solid #a2d2ff' : '1px solid #d8b2ff',
-                                        bgcolor: account.account_type === 'cash' ? '#e6ffe6' : account.account_type === 'bank' ? '#e0f2ff' : '#f5e6ff',
-                                    }}>
+                                    <Card
+                                        onClick={() => handleCardClick(account)}
+                                        sx={{
+                                            p: 2,
+                                            borderRadius: '8px',
+                                            border: account.account_type === 'cash' ? '1px solid #a7d9b5' : account.account_type === 'bank' ? '1px solid #a2d2ff' : account.account_type === 'credit_card' ? '1px solid #d8b2ff' : account.account_type === 'investment' ? '1px solid #ffc107' : account.account_type === 'crypto' ? '1px solid #fd7e14' : account.account_type === 'bond' ? '1px solid #6610f2' : '1px solid #20c997',
+                                            bgcolor: account.account_type === 'cash' ? '#e6ffe6' : account.account_type === 'bank' ? '#e0f2ff' : account.account_type === 'credit_card' ? '#f5e6ff' : account.account_type === 'investment' ? '#fff8e1' : account.account_type === 'crypto' ? '#fff3e0' : account.account_type === 'bond' ? '#f1e6ff' : '#e6fff9',
+                                            cursor: 'pointer',
+                                            '&:hover': {
+                                                boxShadow: '0 4px 20px 0 rgba(0, 0, 0, 0.1)',
+                                                transform: 'scale(1.02)'
+                                            },
+                                            transition: 'box-shadow 0.3s ease, transform 0.3s ease'
+                                        }}>
                                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                                             {account.account_type === 'cash' && (
                                                 <AttachMoneyIcon sx={{ color: '#28a745', mr: 1 }} />
@@ -156,6 +314,18 @@ const Accounts: React.FC = () => {
                                             )}
                                             {account.account_type === 'credit_card' && (
                                                 <CreditCardIcon sx={{ color: '#6f42c1', mr: 1 }} />
+                                            )}
+                                            {account.account_type === 'investment' && (
+                                                <TrendingUpIcon sx={{ color: '#ffc107', mr: 1 }} />
+                                            )}
+                                            {account.account_type === 'crypto' && (
+                                                <MonetizationOnIcon sx={{ color: '#fd7e14', mr: 1 }} />
+                                            )}
+                                            {account.account_type === 'bond' && (
+                                                <AccountBalanceIcon sx={{ color: '#6610f2', mr: 1 }} />
+                                            )}
+                                            {account.account_type === 'loan' && (
+                                                <CreditScoreIcon sx={{ color: '#20c997', mr: 1 }} />
                                             )}
                                             <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>{account.name}</Typography>
                                         </Box>
@@ -237,6 +407,157 @@ const Accounts: React.FC = () => {
                 <DialogActions>
                     <Button onClick={handleCloseAddAccountDialog}>Cancel</Button>
                     <Button onClick={handleCreateAccount}>Create</Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Account Details Dialog */}
+            <Dialog open={openDetailsDialog} onClose={handleCloseDetailsDialog} fullWidth maxWidth="md">
+                {selectedAccount && (
+                    <>
+                        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            {selectedAccount.name}
+                            <IconButton onClick={handleCloseDetailsDialog}>
+                                <CloseIcon />
+                            </IconButton>
+                        </DialogTitle>
+                        <DialogContent>
+                            {detailsLoading ? (
+                                <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}><CircularProgress /></Box>
+                            ) : detailsError ? (
+                                <Alert severity="error">{detailsError}</Alert>
+                            ) : (
+                                <Box>
+                                    <Card sx={{ mb: 3, borderRadius: '16px', boxShadow: 1 }}>
+                                        <CardContent sx={{ p: 3 }}>
+                                            <Grid container spacing={2} alignItems="center">
+                                                <Grid item xs={12} sm={6}>
+                                                    <Typography variant="h6">Balance: {selectedAccount.currency} {selectedAccount.balance.toFixed(2)}</Typography>
+                                                    <Typography variant="body1" color="text.secondary">Account Type: {constants.accountTypes.find(at => at.value === selectedAccount.account_type)?.label || selectedAccount.account_type}</Typography>
+                                                </Grid>
+                                            </Grid>
+                                        </CardContent>
+                                    </Card>
+
+                                    {balanceSnapshots.length > 1 && (
+                                        <Card sx={{ mb: 3, borderRadius: '16px', boxShadow: 1 }}>
+                                            <CardContent>
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                                    <Typography variant="h5" gutterBottom sx={{ mb: 0 }}>Account Growth</Typography>
+                                                    <FormControl size="small">
+                                                        <Select
+                                                            value={timeFrame}
+                                                            onChange={handleTimeFrameChange}
+                                                        >
+                                                            <MenuItem value={'1w'}>1W</MenuItem>
+                                                            <MenuItem value={'1m'}>1M</MenuItem>
+                                                            <MenuItem value={'5y'}>5Y</MenuItem>
+                                                            <MenuItem value={'all'}>All</MenuItem>
+                                                        </Select>
+                                                    </FormControl>
+                                                </Box>
+                                                <Box sx={{ height: 300 }}>
+                                                    <LineChart
+                                                        dataset={filteredSnapshots.slice().reverse().map(s => ({...s, date: new Date(s.date)}))}
+                                                        series={[
+                                                            {
+                                                                dataKey: 'balance',
+                                                                label: 'Balance',
+                                                                valueFormatter: (value) => `${selectedAccount?.currency} ${value.toFixed(2)}`,
+                                                            },
+                                                        ]}
+                                                        xAxis={[{
+                                                            scaleType: 'time',
+                                                            dataKey: 'date',
+                                                            valueFormatter: (date) => new Date(date).toLocaleDateString(),
+                                                        }]}
+                                                    />
+                                                </Box>
+                                            </CardContent>
+                                        </Card>
+                                    )}
+
+                                    <Card sx={{ borderRadius: '16px', boxShadow: 1 }}>
+                                        <CardContent sx={{ p: 3 }}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                                <Typography variant="h5" gutterBottom sx={{ mb: 0 }}>Activities</Typography>
+                                                <Button variant="contained" onClick={() => setOpenRecordBalanceDialog(true)}>Record Balance</Button>
+                                            </Box>
+                                            <List>
+                                                {activities.length > 0 ? (
+                                                    activities.map((activity, index) => (
+                                                        <React.Fragment key={`${activity.type}-${(activity.data as any).id}`}>
+                                                            <ListItem sx={{ py: 1.5 }}>
+                                                                {activity.type === 'transaction' ? (
+                                                                    <>
+                                                                        <ListItemText
+                                                                            primary={<Typography variant="body1" sx={{ fontWeight: 'medium' }}>{(activity.data as Transaction).description}</Typography>}
+                                                                            secondary={`Date: ${new Date(activity.data.date).toLocaleDateString()} | Category: ${(activity.data as Transaction).category}`}
+                                                                        />
+                                                                        <Typography variant="body1" sx={{ fontWeight: 'bold', color: (activity.data as Transaction).amount >= 0 ? 'success.main' : 'error.main' }}>
+                                                                            {(activity.data as Transaction).amount >= 0 ? '+' : ''}{selectedAccount.currency} {(activity.data as Transaction).amount.toFixed(2)}
+                                                                        </Typography>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <ListItemText
+                                                                            primary={<Typography variant="body1" sx={{ fontWeight: 'medium' }}>Balance Recorded</Typography>}
+                                                                            secondary={`Date: ${new Date(activity.data.date).toLocaleDateString()}`}
+                                                                        />
+                                                                        <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                                                                            {selectedAccount.currency} {(activity.data as BalanceSnapshot).balance.toFixed(2)}
+                                                                        </Typography>
+                                                                    </>
+                                                                )}
+                                                            </ListItem>
+                                                            {index < activities.length - 1 && <Divider component="li" />}
+                                                        </React.Fragment>
+                                                    ))
+                                                ) : (
+                                                    <ListItem>
+                                                        <ListItemText primary="No activities found for this account." />
+                                                    </ListItem>
+                                                )}
+                                            </List>
+                                        </CardContent>
+                                    </Card>
+                                </Box>
+                            )}
+                        </DialogContent>
+                    </>
+                )}
+            </Dialog>
+
+            {/* Record Balance Dialog */}
+            <Dialog open={openRecordBalanceDialog} onClose={() => setOpenRecordBalanceDialog(false)}>
+                <DialogTitle>Record Balance for {selectedAccount?.name}</DialogTitle>
+                <DialogContent>
+                    {recordBalanceError && <Alert severity="error" sx={{ mb: 2 }}>{recordBalanceError}</Alert>}
+                    <TextField
+                        autoFocus
+                        margin="dense"
+                        label="Balance"
+                        type="number"
+                        fullWidth
+                        value={recordBalanceAmount}
+                        onChange={(e) => setRecordBalanceAmount(e.target.value)}
+                        sx={{ mb: 2 }}
+                    />
+                    <TextField
+                        margin="dense"
+                        label="Date"
+                        type="date"
+                        fullWidth
+                        value={recordBalanceDate}
+                        onChange={(e) => setRecordBalanceDate(e.target.value)}
+                        sx={{ mb: 2 }}
+                        InputLabelProps={{
+                            shrink: true,
+                        }}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setOpenRecordBalanceDialog(false)}>Cancel</Button>
+                    <Button onClick={handleRecordBalance}>Record</Button>
                 </DialogActions>
             </Dialog>
         </Box>

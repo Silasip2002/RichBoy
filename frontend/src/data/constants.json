@@ -1,11 +1,12 @@
 {
   "accountTypes": [
     { "value": "bank", "label": "Bank Account" },
-    { "value": "cash", "label": "Cash Account" },
+    { "value": "cash", "label": "Cash" },
     { "value": "credit_card", "label": "Credit Card" },
-    { "value": "investment", "label": "Investment Account" },
-    { "value": "loan", "label": "Loan" },
-    { "value": "other", "label": "Other" }
+    { "value": "investment", "label": "Investment" },
+    { "value": "crypto", "label": "Crypto" },
+    { "value": "bond", "label": "Bond" },
+    { "value": "loan", "label": "Loan" }
   ],
   "currencies": [
     { "value": "USD", "label": "USD - United States Dollar" },

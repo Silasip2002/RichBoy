@@ -5,8 +5,9 @@ from .views import (
     AccountViewSet, 
     AssetViewSet, 
     get_stock_price, 
-        search_symbols,
-        CategoryViewSet
+    search_symbols,
+    CategoryViewSet,
+    BalanceSnapshotViewSet
     ) 
     
 router = DefaultRouter()
@@ -14,6 +15,7 @@ router.register(r'transactions', TransactionViewSet, basename='transaction')
 router.register(r'accounts', AccountViewSet, basename='account')
 router.register(r'assets', AssetViewSet, basename='asset')
 router.register(r'categories', CategoryViewSet, basename='category')
+router.register(r'balance-snapshots', BalanceSnapshotViewSet, basename='balance-snapshot')
 # Specific paths must come BEFORE the router include
 urlpatterns = [
     path('get_stock_price/', get_stock_price, name='get_stock_price'),

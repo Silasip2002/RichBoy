@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Transaction, Account, Asset
+from .models import Transaction, Account, Asset, BalanceSnapshot
 
 class TransactionSerializer(serializers.ModelSerializer):
     user = serializers.ReadOnlyField(source='user.username')
@@ -25,3 +25,9 @@ class AssetSerializer(serializers.ModelSerializer):
 
 class CategorySerializer(serializers.Serializer):
     name = serializers.CharField(max_length=100)
+
+class BalanceSnapshotSerializer(serializers.ModelSerializer):
+    user = serializers.ReadOnlyField(source='user.username')
+    class Meta:
+        model = BalanceSnapshot
+        fields = '__all__'
