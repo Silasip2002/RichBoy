@@ -53,7 +53,11 @@ class TransactionViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return self.request.user.transactions.all()
+        queryset = self.request.user.transactions.all()
+        account_id = self.request.query_params.get('account')
+        if account_id:
+            queryset = queryset.filter(account__id=account_id)
+        return queryset
 
     def perform_create(self, serializer):
         transaction = serializer.save(user=self.request.user)
@@ -93,7 +97,11 @@ class BalanceSnapshotViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return self.request.user.balance_snapshots.all()
+        queryset = self.request.user.balance_snapshots.all()
+        account_id = self.request.query_params.get('account')
+        if account_id:
+            queryset = queryset.filter(account__id=account_id)
+        return queryset
 
     def perform_create(self, serializer):
         snapshot = serializer.save(user=self.request.user)
