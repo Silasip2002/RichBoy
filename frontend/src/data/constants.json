@@ -18,7 +18,9 @@
     { "value": "CHF", "label": "CHF - Swiss Franc" },
     { "value": "CNY", "label": "CNY - Chinese Yuan" },
     { "value": "SEK", "label": "SEK - Swedish Krona" },
-    { "value": "NZD", "label": "NZD - New Zealand Dollar" }
+    { "value": "NZD", "label": "NZD - New Zealand Dollar" },
+    { "value": "HKD", "label": "HKD - Hong Kong Dollar" },
+    { "value": "RMB", "label": "RMB - Chinese Renminbi" }
   ],
   "transactionCategories": {
     "income": [
