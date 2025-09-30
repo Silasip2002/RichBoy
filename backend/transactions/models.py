@@ -17,7 +17,6 @@ CURRENCY_CHOICES = [
 
 ACCOUNT_CHOICES = [
     ('cash', 'Cash'),
-    ('bank', 'Bank'),
     ('credit_card', 'Credit Card'),
     ('investment', 'Investment'),
     ('crypto', 'Crypto'),
@@ -29,7 +28,7 @@ ACCOUNT_CHOICES = [
 class Account(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='accounts')
     name = models.CharField(max_length=100)
-    account_type = models.CharField(max_length=20, choices=ACCOUNT_CHOICES, default='bank')
+    account_type = models.CharField(max_length=20, choices=ACCOUNT_CHOICES, default='cash')
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, default='USD')
 
@@ -96,6 +95,7 @@ class Asset(models.Model):
     cost = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
     market_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     market_value = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
+    previous_market_value = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
     change = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     def __str__(self):

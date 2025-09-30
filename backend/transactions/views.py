@@ -312,34 +312,54 @@ def search_symbols(request):
 @permission_classes([permissions.IsAuthenticated])
 def get_portfolio_summary(request):
     user = request.user
-    user_profile = UserProfile.objects.get(user=user) # Get user profile
-    preferred_currency = user_profile.preferred_currency # Get preferred currency
+    user_profile = UserProfile.objects.get(user=user)
+    preferred_currency = user_profile.preferred_currency
 
     accounts = Account.objects.filter(user=user)
-
     total_portfolio_value = Decimal('0.0')
     cash_balance = Decimal('0.0')
 
     for account in accounts:
         converted_balance = convert_currency(account.balance, account.currency, preferred_currency)
         if converted_balance is not None:
-            logger.info(f"Account: {account.name}, Original: {account.balance} {account.currency}, Converted: {converted_balance} {preferred_currency}")
             total_portfolio_value += converted_balance
             if account.account_type == 'cash':
                 cash_balance += converted_balance
         else:
-            logger.warning(f"Could not convert account balance for account {account.id} from {account.currency} to {preferred_currency}")
+            logger.warning(f"Could not convert account balance for account {account.id}")
 
-    # For now, todays_change is set to 0 as its calculation was based on assets
-    todays_change = Decimal('0.0')
+    # --- Today's Change Calculation ---
+    yesterday = timezone.now().date() - timedelta(days=1)
+    yesterday_portfolio_value = Decimal('0.0')
+    for account in accounts:
+        latest_snapshot = BalanceSnapshot.objects.filter(account=account, date__lte=yesterday).order_by('-date').first()
+        if latest_snapshot:
+            converted_snapshot_balance = convert_currency(latest_snapshot.balance, account.currency, preferred_currency)
+            if converted_snapshot_balance:
+                yesterday_portfolio_value += converted_snapshot_balance
 
-    logger.info(f"Total portfolio value for user {user.id}: {total_portfolio_value}")
+    todays_change_value = total_portfolio_value - yesterday_portfolio_value
+    todays_change_percentage = (todays_change_value / yesterday_portfolio_value) * 100 if yesterday_portfolio_value else Decimal('0.0')
+
+    # --- Annual Return Calculation ---
+    one_year_ago = timezone.now().date() - timedelta(days=365)
+    past_portfolio_value = Decimal('0.0')
+    for account in accounts:
+        latest_snapshot = BalanceSnapshot.objects.filter(account=account, date__lte=one_year_ago).order_by('-date').first()
+        if latest_snapshot:
+            converted_snapshot_balance = convert_currency(latest_snapshot.balance, account.currency, preferred_currency)
+            if converted_snapshot_balance:
+                past_portfolio_value += converted_snapshot_balance
+    
+    annual_return_percentage = ((total_portfolio_value - past_portfolio_value) / past_portfolio_value) * 100 if past_portfolio_value else Decimal('0.0')
 
     return Response({
         'total_portfolio_value': total_portfolio_value,
-        'todays_change': todays_change,
+        'todays_change_value': todays_change_value,
+        'todays_change_percentage': todays_change_percentage,
+        'annual_return_percentage': annual_return_percentage,
         'cash_balance': cash_balance,
-        'preferred_currency': preferred_currency, # Return the currency used for calculation
+        'preferred_currency': preferred_currency,
     })
 
 @api_view(['GET'])
@@ -382,7 +402,9 @@ def get_asset_allocation(request):
     asset_allocation = {}
     for asset in assets:
         if asset.asset_type not in asset_allocation:
-            asset_allocation[asset.asset_type] = 0
-        asset_allocation[asset.asset_type] += asset.market_value
+            asset_allocation[asset.asset_type] = Decimal('0.0')
+        
+        market_value = asset.market_value if asset.market_value is not None else Decimal('0.0')
+        asset_allocation[asset.asset_type] += market_value
 
     return Response(asset_allocation)

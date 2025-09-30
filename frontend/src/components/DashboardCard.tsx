@@ -7,6 +7,7 @@ const DashboardCard: React.FC = () => {
   const { token } = useAuth();
   const [totalPortfolioValue, setTotalPortfolioValue] = useState("$0.00");
   const [todaysChange, setTodaysChange] = useState("+$0.00 (+0.00%)");
+  const [annualReturn, setAnnualReturn] = useState("+0.00%");
   const [cashBalance, setCashBalance] = useState("$0.00");
 
   useEffect(() => {
@@ -23,7 +24,16 @@ const DashboardCard: React.FC = () => {
         });
         setTotalPortfolioValue(`${currency} ${formattedTotalValue}`);
 
-        setTodaysChange(`${data.todays_change >= 0 ? '+' : ''}${data.todays_change.toFixed(2)}%`);
+        const todaysChangeValue = parseFloat(data.todays_change_value);
+        const todaysChangePercentage = parseFloat(data.todays_change_percentage);
+        const formattedChangeValue = todaysChangeValue.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        });
+        setTodaysChange(`${todaysChangeValue >= 0 ? '+' : ''}${formattedChangeValue} (${todaysChangePercentage.toFixed(2)}%)`);
+
+        const annualReturnPercentage = parseFloat(data.annual_return_percentage);
+        setAnnualReturn(`${annualReturnPercentage >= 0 ? '+' : ''}${annualReturnPercentage.toFixed(2)}%`);
 
         const formattedCashBalance = data.cash_balance.toLocaleString('en-US', {
           minimumFractionDigits: 2,
@@ -41,6 +51,7 @@ const DashboardCard: React.FC = () => {
   // Determine color for Today's Change
   const isPositiveChange = todaysChange.startsWith('+');
   const changeColor = isPositiveChange ? 'success.main' : 'error.main';
+  const annualReturnColor = annualReturn.startsWith('+') ? 'success.main' : 'error.main';
 
   return (
     <Card sx={{ minWidth: 275, mb: 3 }}>
@@ -66,8 +77,8 @@ const DashboardCard: React.FC = () => {
             <Typography variant="subtitle2" color="text.secondary">
               Annual Return
             </Typography>
-            <Typography variant="h6" component="div" sx={{ fontSize: '1rem' }}>
-              +15.00%
+            <Typography variant="h6" component="div" sx={{ fontSize: '1rem', color: annualReturnColor }}>
+              {annualReturn}
             </Typography>
           </Box>
           <Box sx={{ width: '25%', flexGrow: 1 }}> {/* Replaced Grid item with Box */}
