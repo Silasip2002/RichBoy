@@ -398,13 +398,20 @@ def get_transaction_summary(request):
 @permission_classes([permissions.IsAuthenticated])
 def get_asset_allocation(request):
     user = request.user
-    assets = Asset.objects.filter(user=user)
-    asset_allocation = {}
-    for asset in assets:
-        if asset.asset_type not in asset_allocation:
-            asset_allocation[asset.asset_type] = Decimal('0.0')
-        
-        market_value = asset.market_value if asset.market_value is not None else Decimal('0.0')
-        asset_allocation[asset.asset_type] += market_value
+    user_profile = UserProfile.objects.get(user=user)
+    preferred_currency = user_profile.preferred_currency
 
-    return Response(asset_allocation)
+    accounts = Account.objects.filter(user=user)
+    account_type_allocation = {}
+
+    for account in accounts:
+        if account.account_type not in account_type_allocation:
+            account_type_allocation[account.account_type] = Decimal('0.0')
+
+        converted_balance = convert_currency(account.balance, account.currency, preferred_currency)
+        if converted_balance is not None:
+            account_type_allocation[account.account_type] += converted_balance
+        else:
+            logger.warning(f"Could not convert account balance for account {account.id} from {account.currency} to {preferred_currency}")
+
+    return Response(account_type_allocation)

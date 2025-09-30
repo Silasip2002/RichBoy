@@ -3,6 +3,7 @@ import { Card, CardContent, Typography, Box, Divider, Button, ButtonGroup } from
 import { LineChart, PieChart } from '@mui/x-charts';
 import { useAuth } from '../contexts/AuthContext';
 import { getAssetAllocation } from '../services/api';
+import { Percent } from '@mui/icons-material';
 
 type Timeframe = '1M' | '3M' | '6M' | 'YTD' | '1Y' | 'All';
 
@@ -93,6 +94,11 @@ const PortfolioPerformanceCard: React.FC = () => {
             series={[
               {
                 data: assetAllocation,
+                arcLabel: (item) => {
+                  const total = assetAllocation.reduce((sum, entry) => sum + entry.value, 0);
+                  const percentage = total > 0 ? (item.value / total * 100).toFixed(2) : '0.00';
+                  return `${percentage}%`;
+                },
                 highlightScope: { fade: 'global', highlight: 'item' },
                 faded: { innerRadius: 30, additionalRadius: -30, color: 'gray' },
               },
