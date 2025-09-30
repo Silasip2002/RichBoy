@@ -50,75 +50,50 @@ const PortfolioPerformanceCard: React.FC = () => {
           Portfolio Performance
         </Typography>
 
-        <ButtonGroup variant="outlined" aria-label="timeframe selection" sx={{ mb: 2, gap: '8px' }}>
-
-          
-          {timeframes.map((timeframe) => (
-            <Button
-              key={timeframe}
-              onClick={() => setSelectedTimeframe(timeframe)}
-              variant={selectedTimeframe === timeframe ? 'contained' : 'outlined'}
-              sx={{
-                textTransform: 'none',
-                borderRadius: '20px', // More rounded corners
-                minWidth: '60px', // Ensure consistent width
-              }}
-            >
-              {timeframe}
-            </Button>
-          ))}
-        </ButtonGroup>
-
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', mb: 2 }}>
-          <Box sx={{ width: '33.33%' }}>
-            <Typography variant="subtitle2" color="text.secondary">Daily Change</Typography>
-            <Typography variant="h6" color="success.main">+$123.45</Typography>
-          </Box>
-          <Box sx={{ width: '33.33%' }}>
-            <Typography variant="subtitle2" color="text.secondary">Weekly Change</Typography>
-            <Typography variant="h6" color="error.main">-$567.89</Typography>
-          </Box>
-          <Box sx={{ width: '33.33%' }}>
-            <Typography variant="subtitle2" color="text.secondary">Monthly Change</Typography>
-            <Typography variant="h6" color="success.main">+$1,234.56</Typography>
-          </Box>
-        </Box>
-
         <Divider sx={{ my: 2 }} />
 
-        <Typography variant="h6" component="div" sx={{ mb: 1 }}>
-          Asset Allocation
-        </Typography>
-        <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <PieChart
-            series={[
-              {
-                data: assetAllocation,
-                arcLabel: (item) => {
-                  const total = assetAllocation.reduce((sum, entry) => sum + entry.value, 0);
-                  const percentage = total > 0 ? (item.value / total * 100).toFixed(2) : '0.00';
-                  return `${percentage}%`;
-                },
-                highlightScope: { fade: 'global', highlight: 'item' },
-                faded: { innerRadius: 30, additionalRadius: -30, color: 'gray' },
-              },
-            ]}
-            height={200}
-          />
-        </Box>
-
-        <Divider sx={{ my: 2 }} />
-
-        <Typography variant="h6" component="div" sx={{ mb: 1 }}>
-          Asset Performance
-        </Typography>
-        <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <LineChart
-            xAxis={lineChartData[selectedTimeframe].xAxis}
-            series={lineChartData[selectedTimeframe].series}
-            height={200}
-            margin={{ left: 50, right: 50, top: 20, bottom: 20 }}
-          />
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', md: 'row' },
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            gap: 4,
+            width: '100%',
+          }}
+        >
+          <Box sx={{ width: { xs: '100%', md: '70%' }, minWidth: 0 }}>
+            <Typography variant="h6" component="div" sx={{ mb: 1 }}>
+              Performance
+            </Typography>
+            <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <LineChart
+                xAxis={lineChartData[selectedTimeframe].xAxis}
+                series={lineChartData[selectedTimeframe].series}
+                height={200}
+                margin={{ left: 50, right: 50, top: 20, bottom: 20 }}
+              />
+            </Box>
+          </Box>
+          <Box sx={{ width: { xs: '100%', md: '30%' }, minWidth: 0 }}>
+            <Typography variant="h6" component="div" sx={{ mb: 1 }}>
+              Allocation
+            </Typography>
+            <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <PieChart
+                series={[
+                  {
+                    data: assetAllocation.map((entry) => ({ ...entry, label: entry.label.toUpperCase() })),
+                    highlightScope: { fade: 'global', highlight: 'item' },
+                    faded: { innerRadius: 30, additionalRadius: -30, color: 'gray' },
+                    arcLabel: (item) => `${(item.value / assetAllocation.reduce((sum, entry) => sum + entry.value, 0) * 100).toFixed(2)}%`,
+                    arcLabelMinAngle: 45,
+                  },
+                ]}
+                height={200}
+              />
+            </Box>
+          </Box>
         </Box>
 
       </CardContent>
