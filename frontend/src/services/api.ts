@@ -114,6 +114,7 @@ export const createAsset = async (token: string, assetData: any) => {
         const errorData = await response.json();
         throw new Error(Object.values(errorData).flat().join(' ') || 'Failed to create asset');
     }
+    return response.json();
 }
 export const createBalanceSnapshot = async (token: string, data: any) => {
     const response = await fetch(`${API_BASE_URL}/balance-snapshots/`, {
