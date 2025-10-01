@@ -505,7 +505,7 @@ const Accounts: React.FC<AccountsProps> = ({ refresh, onDataChange }) => {
                                                     color: account.balance >= 0 ? '#28a745' : '#dc3545',
                                                 }}
                                             >
-                                                {account.currency} {account.balance.toFixed(2)}
+                                                {account.currency} {account.balance.toLocaleString('en-us', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </Typography>
                                             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                                                 {constants.accountTypes.find(at => at.value === account.account_type)?.label || account.account_type}
@@ -784,7 +784,7 @@ const Accounts: React.FC<AccountsProps> = ({ refresh, onDataChange }) => {
                                                                             secondary={`Date: ${new Date(activity.data.date).toLocaleDateString()}`}
                                                                         />
                                                                         <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
-                                                                            {selectedAccount.currency} {(activity.data as BalanceSnapshot).balance.toFixed(2)}
+                                                                            {selectedAccount.currency} {(activity.data as BalanceSnapshot).balance.toLocaleString('en-us',{minimumFractionDigits: 2, maximumFractionDigits: 2})}
                                                                         </Typography>
                                                                     </>
                                                                 )}
