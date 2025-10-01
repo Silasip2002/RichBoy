@@ -230,6 +230,7 @@ const Accounts: React.FC<AccountsProps> = ({ refresh, onDataChange }) => {
     };
 
     const handleOpenEditDialog = () => {
+        event
         if (selectedAccount) {
             setEditAccountData({ ...selectedAccount });
             setOpenEditAccountDialog(true);
