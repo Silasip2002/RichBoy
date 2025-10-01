@@ -32,8 +32,8 @@ const DashboardCard: React.FC = () => {
         const todaysChangeValue = parseFloat(data.todays_change_value);
         const todaysChangePercentage = parseFloat(data.todays_change_percentage);
         const formattedChangeValue = todaysChangeValue.toLocaleString('en-US', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
         });
         setTodaysChange(`${todaysChangeValue >= 0 ? '+' : ''}${formattedChangeValue} (${todaysChangePercentage.toFixed(2)}%)`);
 
@@ -157,19 +157,21 @@ const DashboardCard: React.FC = () => {
                 yAxis={[{
                   valueFormatter: (value: number) => {
                     if (value == null) return '';
+
                     const absValue = Math.abs(value);
                     let formatted = '';
                     if (absValue >= 1e9) {
-                      formatted = `$${(value / 1e9).toFixed(1)}B`;
+                      formatted = `${(value / 1e9).toFixed(1)}B`;
                     } else if (absValue >= 1e6) {
-                      formatted = `$${(value / 1e6).toFixed(1)}M`;
+                      formatted = `${(value / 1e6).toFixed(1)}M`;
                     } else if (absValue >= 1e3) {
-                      formatted = `$${(value / 1e3).toFixed(1)}K`;
+                      formatted = `${(value / 1e3).toFixed(1)}K`;
                     } else {
-                      formatted = `$${value.toFixed(2)}`;
+                      formatted = `${value.toFixed(2)}`;
                     }
                     return formatted;
                   },
+                  width: 120,
                 }]}
                 margin={{ left: 30, right: 20, top: 20, bottom: 30 }}
               />
