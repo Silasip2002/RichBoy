@@ -1,6 +1,5 @@
 {
   "accountTypes": [
-    { "value": "bank", "label": "Bank Account" },
     { "value": "cash", "label": "Cash" },
     { "value": "credit_card", "label": "Credit Card" },
     { "value": "investment", "label": "Investment" },

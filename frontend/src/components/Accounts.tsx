@@ -192,12 +192,21 @@ const Accounts: React.FC<AccountsProps> = ({ refresh }) => {
         if (!token) return;
         setAddAccountError(null);
         try {
-            await createAccount(token, {
+            const newAccount = await createAccount(token, {
                 name: newAccountName,
                 account_type: newAccountType,
                 balance: parseFloat(newAccountBalance),
                 currency: newAccountCurrency,
             });
+
+            if (newAccount && newAccount.id) {
+                await createBalanceSnapshot(token, {
+                    account: newAccount.id,
+                    balance: parseFloat(newAccountBalance),
+                    date: new Date().toISOString().split('T')[0],
+                });
+            }
+
             handleCloseAddAccountDialog();
             fetchAccounts(); // Refresh accounts list
         } catch (err: any) {
