@@ -156,7 +156,7 @@ const TransactionsPage = () => {
                 <Reports />
             </TabPanel>
             <TabPanel value={value} index={2}>
-                <Accounts refresh={refreshAccounts} />
+                <Accounts refresh={refreshAccounts} onDataChange={handleTransactionAdded} />
             </TabPanel>
             <TabPanel value={value} index={3}>
                 <Budgets />

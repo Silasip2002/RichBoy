@@ -53,9 +53,10 @@ interface Activity {
 
 interface AccountsProps {
     refresh?: number;
+    onDataChange?: () => void;
 }
 
-const Accounts: React.FC<AccountsProps> = ({ refresh }) => {
+const Accounts: React.FC<AccountsProps> = ({ refresh, onDataChange }) => {
     const { token } = useAuth();
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [loading, setLoading] = useState(true);
@@ -208,7 +209,9 @@ const Accounts: React.FC<AccountsProps> = ({ refresh }) => {
             }
 
             handleCloseAddAccountDialog();
-            fetchAccounts(); // Refresh accounts list
+            if (onDataChange) {
+                onDataChange();
+            }
         } catch (err: any) {
             setAddAccountError(err.message || 'Failed to create account');
             console.error('Error creating account:', err);
@@ -216,6 +219,7 @@ const Accounts: React.FC<AccountsProps> = ({ refresh }) => {
     };
 
     const handleMenuClick = (event: React.MouseEvent<HTMLElement>, account: Account) => {
+        event.stopPropagation();
         setAnchorEl(event.currentTarget);
         setSelectedAccount(account);
     };
@@ -250,7 +254,9 @@ const Accounts: React.FC<AccountsProps> = ({ refresh }) => {
                 currency: editAccountData.currency,
             });
             handleCloseEditDialog();
-            fetchAccounts();
+            if (onDataChange) {
+                onDataChange();
+            }
         } catch (err: any) {
             setEditAccountError(err.message || 'Failed to update account');
             console.error('Error updating account:', err);
@@ -259,18 +265,22 @@ const Accounts: React.FC<AccountsProps> = ({ refresh }) => {
 
     const handleOpenDeleteDialog = () => {
         setOpenDeleteConfirmDialog(true);
-        handleMenuClose();
     };
 
     const handleCloseDeleteDialog = () => {
         setOpenDeleteConfirmDialog(false);
+        handleMenuClose();
     };
 
     const handleDeleteAccount = async () => {
         if (!token || !selectedAccount) return;
+      
         try {
             await deleteAccount(token, selectedAccount.id);
             handleCloseDeleteDialog();
+            if (onDataChange) {
+                onDataChange();
+            }
             fetchAccounts();
         } catch (err: any) {
             console.error('Error deleting account:', err);
@@ -325,7 +335,9 @@ const Accounts: React.FC<AccountsProps> = ({ refresh }) => {
             setOpenRecordBalanceDialog(false);
             setRecordBalanceAmount('');
             // Refresh data
-            fetchAccounts();
+            if (onDataChange) {
+                onDataChange();
+            }
             fetchAccountDetailsAndActivities();
         } catch (err: any) {
             setRecordBalanceError(err.message || 'Failed to record balance');
