@@ -67,12 +67,8 @@ const PortfolioPerformanceCard: React.FC = () => {
               Performance
             </Typography>
             <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <LineChart
-                xAxis={lineChartData[selectedTimeframe].xAxis}
-                series={lineChartData[selectedTimeframe].series}
-                height={200}
-                margin={{ left: 50, right: 50, top: 20, bottom: 20 }}
-              />
+              {/* TOOD: AI coath suggestion */}
+              AI Coach Suggestion!!
             </Box>
           </Box>
           <Box sx={{ width: { xs: '100%', md: '30%' }, minWidth: 0 }}>
