@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 import subprocess # Import subprocess
 from datetime import datetime, timedelta # Import datetime and timedelta
 from django.utils import timezone # Import timezone
-from transactions.models import ExchangeRate # Import ExchangeRate model
+from assets.models import ExchangeRate # Import ExchangeRate model
 import os # Import os
 import sys # Import sys
 

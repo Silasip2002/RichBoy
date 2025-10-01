@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import {
     Box, Button, Card, CardContent, Typography, Grid,
@@ -52,28 +53,23 @@ interface Activity {
 }
 
 interface AccountsProps {
-    refresh?: number;
     onDataChange?: () => void;
 }
 
-const Accounts: React.FC<AccountsProps> = ({ refresh, onDataChange }) => {
+const Accounts: React.FC<AccountsProps> = ({ onDataChange }) => {
     const { token } = useAuth();
-    const [accounts, setAccounts] = useState<Account[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const queryClient = useQueryClient();
 
     const [openAddAccountDialog, setOpenAddAccountDialog] = useState(false);
     const [newAccountName, setNewAccountName] = useState('');
     const [newAccountType, setNewAccountType] = useState(constants.accountTypes[0].value);
     const [newAccountBalance, setNewAccountBalance] = useState('');
     const [newAccountCurrency, setNewAccountCurrency] = useState(constants.currencies[0].value);
-    const [addAccountError, setAddAccountError] = useState<string | null>(null);
 
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
     const [openEditAccountDialog, setOpenEditAccountDialog] = useState(false);
     const [editAccountData, setEditAccountData] = useState<Partial<Account> | null>(null);
-    const [editAccountError, setEditAccountError] = useState<string | null>(null);
 
     const [openDeleteConfirmDialog, setOpenDeleteConfirmDialog] = useState(false);
 
@@ -96,41 +92,34 @@ const Accounts: React.FC<AccountsProps> = ({ refresh, onDataChange }) => {
 
     const [timeFrame, setTimeFrame] = useState('all');
 
-    const fetchAccounts = async () => {
-        if (!token) return;
-        setLoading(true);
-        setError(null);
-        try {
+    const { data: accounts = [], isLoading, isError, error } = useQuery<Account[], Error>({
+        queryKey: ['accounts', token],
+        queryFn: async () => {
+            if (!token) return [];
             const data = await getAccounts(token);
             if (Array.isArray(data.results)) {
-                setAccounts(data.results.map((acc: any) => ({ ...acc, balance: parseFloat(acc.balance) })));
+                return data.results.map((acc: any) => ({ ...acc, balance: parseFloat(acc.balance) }));
             } else if (Array.isArray(data)) {
-                setAccounts(data.map((acc: any) => ({ ...acc, balance: parseFloat(acc.balance) })));
-            } else {
-                console.error('Received data is not an array or paginated response', data);
-                setAccounts([]);
+                return data.map((acc: any) => ({ ...acc, balance: parseFloat(acc.balance) }));
             }
-        } catch (err: any) {
-            console.error('Error fetching accounts:', err);
-            setError(err.message || 'Network error or server is unreachable');
-        } finally {
-            setLoading(false);
-        }
-    };
+            console.error('Received data is not an array or paginated response', data);
+            return [];
+        },
+        enabled: !!token,
+    });
 
-    const fetchUserProfile = async () => {
-        if (!token) return;
-        try {
-            const profile = await getUserProfile(token);
+    const { data: userProfile } = useQuery({
+        queryKey: ['userProfile', token],
+        queryFn: () => getUserProfile(token!),
+        enabled: !!token,
+        onSuccess: (profile) => {
             if (profile && profile.preferred_currency) {
                 setPreferredCurrency(profile.preferred_currency);
                 setInitialPreferredCurrency(profile.preferred_currency);
             }
-        } catch (err: any) {
-            console.error('Error fetching user profile:', err);
-            // Handle error, maybe set a default or show a message
         }
-    }
+    });
+
     const fetchAccountDetailsAndActivities = async () => {
         if (!token || !selectedAccount) return;
 
@@ -165,11 +154,6 @@ const Accounts: React.FC<AccountsProps> = ({ refresh, onDataChange }) => {
     };
 
     useEffect(() => {
-        fetchAccounts();
-        fetchUserProfile(); // Fetch user profile on mount
-    }, [token, refresh]);
-
-    useEffect(() => {
         if (openDetailsDialog) {
             fetchAccountDetailsAndActivities();
         }
@@ -177,7 +161,6 @@ const Accounts: React.FC<AccountsProps> = ({ refresh, onDataChange }) => {
 
     const handleOpenAddAccountDialog = () => {
         setOpenAddAccountDialog(true);
-        setAddAccountError(null);
     };
 
     const handleCloseAddAccountDialog = () => {
@@ -186,36 +169,31 @@ const Accounts: React.FC<AccountsProps> = ({ refresh, onDataChange }) => {
         setNewAccountType(constants.accountTypes[0].value);
         setNewAccountBalance('');
         setNewAccountCurrency(constants.currencies[0].value);
-        setAddAccountError(null);
     };
 
-    const handleCreateAccount = async () => {
-        if (!token) return;
-        setAddAccountError(null);
-        try {
-            const newAccount = await createAccount(token, {
-                name: newAccountName,
-                account_type: newAccountType,
-                balance: parseFloat(newAccountBalance),
-                currency: newAccountCurrency,
-            });
-
+    const createAccountMutation = useMutation({
+        mutationFn: (newAccount: { name: string; account_type: string; balance: number; currency: string; }) => createAccount(token!, newAccount),
+        onSuccess: (newAccount) => {
             if (newAccount && newAccount.id) {
-                await createBalanceSnapshot(token, {
+                createBalanceSnapshot(token!, {
                     account: newAccount.id,
                     balance: parseFloat(newAccountBalance),
                     date: new Date().toISOString().split('T')[0],
                 });
             }
-
+            queryClient.invalidateQueries({ queryKey: ['accounts'] });
+            if (onDataChange) onDataChange();
             handleCloseAddAccountDialog();
-            if (onDataChange) {
-                onDataChange();
-            }
-        } catch (err: any) {
-            setAddAccountError(err.message || 'Failed to create account');
-            console.error('Error creating account:', err);
-        }
+        },
+    });
+
+    const handleCreateAccount = () => {
+        createAccountMutation.mutate({
+            name: newAccountName,
+            account_type: newAccountType,
+            balance: parseFloat(newAccountBalance),
+            currency: newAccountCurrency,
+        });
     };
 
     const handleMenuClick = (event: React.MouseEvent<HTMLElement>, account: Account) => {
@@ -230,7 +208,6 @@ const Accounts: React.FC<AccountsProps> = ({ refresh, onDataChange }) => {
     };
 
     const handleOpenEditDialog = () => {
-        event
         if (selectedAccount) {
             setEditAccountData({ ...selectedAccount });
             setOpenEditAccountDialog(true);
@@ -241,27 +218,20 @@ const Accounts: React.FC<AccountsProps> = ({ refresh, onDataChange }) => {
     const handleCloseEditDialog = () => {
         setOpenEditAccountDialog(false);
         setEditAccountData(null);
-        setEditAccountError(null);
     };
 
-    const handleUpdateAccount = async () => {
-        if (!token || !editAccountData || !editAccountData.id) return;
-        setEditAccountError(null);
-        try {
-            await updateAccount(token, editAccountData.id, {
-                name: editAccountData.name,
-                account_type: editAccountData.account_type,
-                balance: editAccountData.balance,
-                currency: editAccountData.currency,
-            });
+    const updateAccountMutation = useMutation({
+        mutationFn: (updatedAccount: Partial<Account>) => updateAccount(token!, updatedAccount.id!, updatedAccount),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['accounts'] });
+            if (onDataChange) onDataChange();
             handleCloseEditDialog();
-            if (onDataChange) {
-                onDataChange();
-            }
-        } catch (err: any) {
-            setEditAccountError(err.message || 'Failed to update account');
-            console.error('Error updating account:', err);
-        }
+        },
+    });
+
+    const handleUpdateAccount = () => {
+        if (!editAccountData) return;
+        updateAccountMutation.mutate(editAccountData);
     };
 
     const handleOpenDeleteDialog = () => {
@@ -273,19 +243,18 @@ const Accounts: React.FC<AccountsProps> = ({ refresh, onDataChange }) => {
         handleMenuClose();
     };
 
-    const handleDeleteAccount = async () => {
-        if (!token || !selectedAccount) return;
-      
-        try {
-            await deleteAccount(token, selectedAccount.id);
+    const deleteAccountMutation = useMutation({
+        mutationFn: (accountId: number) => deleteAccount(token!, accountId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['accounts'] });
+            if (onDataChange) onDataChange();
             handleCloseDeleteDialog();
-            if (onDataChange) {
-                onDataChange();
-            }
-            fetchAccounts();
-        } catch (err: any) {
-            console.error('Error deleting account:', err);
-        }
+        },
+    });
+
+    const handleDeleteAccount = () => {
+        if (!selectedAccount) return;
+        deleteAccountMutation.mutate(selectedAccount.id);
     };
 
     const handleSavePreferredCurrency = async () => {
@@ -373,7 +342,7 @@ const Accounts: React.FC<AccountsProps> = ({ refresh, onDataChange }) => {
         return snapshotDate >= fromDate;
     });
 
-    if (loading) {
+    if (isLoading) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
                 <CircularProgress />
@@ -381,10 +350,10 @@ const Accounts: React.FC<AccountsProps> = ({ refresh, onDataChange }) => {
         );
     }
 
-    if (error) {
+    if (isError) {
         return (
             <Box sx={{ my: 3 }}>
-                <Alert severity="error">{error}</Alert>
+                <Alert severity="error">{error.message}</Alert>
             </Box>
         );
     }
@@ -505,7 +474,7 @@ const Accounts: React.FC<AccountsProps> = ({ refresh, onDataChange }) => {
                                                     color: account.balance >= 0 ? '#28a745' : '#dc3545',
                                                 }}
                                             >
-                                                {account.currency} {account.balance.toLocaleString('en-us', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                {account.currency} {account.balance.toFixed(2)}
                                             </Typography>
                                             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                                                 {constants.accountTypes.find(at => at.value === account.account_type)?.label || account.account_type}
@@ -539,7 +508,7 @@ const Accounts: React.FC<AccountsProps> = ({ refresh, onDataChange }) => {
             <Dialog open={openAddAccountDialog} onClose={handleCloseAddAccountDialog}>
                 <DialogTitle>Add New Account</DialogTitle>
                 <DialogContent>
-                    {addAccountError && <Alert severity="error" sx={{ mb: 2 }}>{addAccountError}</Alert>}
+                    {createAccountMutation.isError && <Alert severity="error" sx={{ mb: 2 }}>{createAccountMutation.error.message}</Alert>}
                     <TextField
                         autoFocus
                         margin="dense"
@@ -592,7 +561,9 @@ const Accounts: React.FC<AccountsProps> = ({ refresh, onDataChange }) => {
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={handleCloseAddAccountDialog}>Cancel</Button>
-                    <Button onClick={handleCreateAccount}>Create</Button>
+                    <Button onClick={handleCreateAccount} disabled={createAccountMutation.isPending}>
+                        {createAccountMutation.isPending ? <CircularProgress size={24} /> : 'Create'}
+                    </Button>
                 </DialogActions>
             </Dialog>
 
@@ -600,7 +571,7 @@ const Accounts: React.FC<AccountsProps> = ({ refresh, onDataChange }) => {
             <Dialog open={openEditAccountDialog} onClose={handleCloseEditDialog}>
                 <DialogTitle>Edit Account</DialogTitle>
                 <DialogContent>
-                    {editAccountError && <Alert severity="error" sx={{ mb: 2 }}>{editAccountError}</Alert>}
+                    {updateAccountMutation.isError && <Alert severity="error" sx={{ mb: 2 }}>{updateAccountMutation.error.message}</Alert>}
                     <TextField
                         autoFocus
                         margin="dense"
@@ -653,7 +624,9 @@ const Accounts: React.FC<AccountsProps> = ({ refresh, onDataChange }) => {
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={handleCloseEditDialog}>Cancel</Button>
-                    <Button onClick={handleUpdateAccount}>Save</Button>
+                    <Button onClick={handleUpdateAccount} disabled={updateAccountMutation.isPending}>
+                        {updateAccountMutation.isPending ? <CircularProgress size={24} /> : 'Save'}
+                    </Button>
                 </DialogActions>
             </Dialog>
 
@@ -665,10 +638,13 @@ const Accounts: React.FC<AccountsProps> = ({ refresh, onDataChange }) => {
                 <DialogTitle>Confirm Deletion</DialogTitle>
                 <DialogContent>
                     <Typography>Are you sure you want to delete the account "{selectedAccount?.name}"? This action cannot be undone.</Typography>
+                    {deleteAccountMutation.isError && <Alert severity="error" sx={{ mt: 2 }}>{deleteAccountMutation.error.message}</Alert>}
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={handleCloseDeleteDialog}>Cancel</Button>
-                    <Button onClick={handleDeleteAccount} color="error">Delete</Button>
+                    <Button onClick={handleDeleteAccount} color="error" disabled={deleteAccountMutation.isPending}>
+                        {deleteAccountMutation.isPending ? <CircularProgress size={24} /> : 'Delete'}
+                    </Button>
                 </DialogActions>
             </Dialog>
             {/* Account Details Dialog */}
@@ -784,7 +760,7 @@ const Accounts: React.FC<AccountsProps> = ({ refresh, onDataChange }) => {
                                                                             secondary={`Date: ${new Date(activity.data.date).toLocaleDateString()}`}
                                                                         />
                                                                         <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
-                                                                            {selectedAccount.currency} {(activity.data as BalanceSnapshot).balance.toLocaleString('en-us',{minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                                                            {selectedAccount.currency} {(activity.data as BalanceSnapshot).balance.toFixed(2)}
                                                                         </Typography>
                                                                     </>
                                                                 )}
