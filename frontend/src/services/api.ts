@@ -310,3 +310,13 @@ export const updateBalanceSnapshot = async (token: string, id: string, data: any
     }
     return response.json();
 };
+
+export const getPortfolioGrowth = async (token: string, timeframe: string = 'all') => {
+    const response = await fetch(`${API_BASE_URL}/get_portfolio_growth/?timeframe=${timeframe}`, {
+        headers: getAuthHeaders(token),
+    });
+    if (!response.ok) {
+        throw new Error('Failed to fetch portfolio growth data');
+    }
+    return response.json();
+};

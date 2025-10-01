@@ -415,3 +415,60 @@ def get_asset_allocation(request):
             logger.warning(f"Could not convert account balance for account {account.id} from {account.currency} to {preferred_currency}")
 
     return Response(account_type_allocation)
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_portfolio_growth(request):
+    user = request.user
+    user_profile = UserProfile.objects.get(user=user)
+    preferred_currency = user_profile.preferred_currency
+
+    all_accounts = Account.objects.filter(user=user)
+    
+    # Get all unique dates from all snapshots for the user
+    all_snapshot_dates = BalanceSnapshot.objects.filter(user=user).values_list('date', flat=True).distinct().order_by('date')
+
+    portfolio_growth_data = {}
+
+    for date in all_snapshot_dates:
+        current_date_total = Decimal('0.0')
+        for account in all_accounts:
+            # Find the latest snapshot for this account on or before the current date
+            latest_snapshot = BalanceSnapshot.objects.filter(
+                account=account,
+                date__lte=date
+            ).order_by('-date').first()
+
+            if latest_snapshot:
+                converted_balance = convert_currency(latest_snapshot.balance, account.currency, preferred_currency)
+                if converted_balance is not None:
+                    current_date_total += converted_balance
+                else:
+                    logger.warning(f"Could not convert snapshot balance for account {account.id} on {date.isoformat()}")
+
+        portfolio_growth_data[date.isoformat()] = current_date_total
+
+    # Convert to a list of objects for the frontend
+    response_data = [
+        {'date': date, 'total_balance': balance}
+        for date, balance in portfolio_growth_data.items()
+    ]
+    
+    # Filter by timeframe if provided
+    timeframe = request.query_params.get('timeframe', 'all')
+    now = timezone.now().date()
+    
+    if timeframe == '1w':
+        start_date = now - timedelta(weeks=1)
+        response_data = [d for d in response_data if datetime.fromisoformat(d['date']).date() >= start_date]
+    elif timeframe == '1m':
+        start_date = now - timedelta(days=30)
+        response_data = [d for d in response_data if datetime.fromisoformat(d['date']).date() >= start_date]
+    elif timeframe == '5y':
+        start_date = now - timedelta(days=5*365)
+        response_data = [d for d in response_data if datetime.fromisoformat(d['date']).date() >= start_date]
+    
+    # Sort by date to ensure correct line chart display
+    response_data.sort(key=lambda x: x['date'])
+
+    return Response(response_data)

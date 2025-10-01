@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, Typography, Box } from '@mui/material';
+import { Card, CardContent, Typography, Box, ButtonGroup, Button } from '@mui/material'; // Added ButtonGroup, Button
+import { LineChart } from '@mui/x-charts/LineChart'; // Added LineChart
 import { useAuth } from '../contexts/AuthContext';
-import { getPortfolioSummary } from '../services/api';
+import { getPortfolioSummary, getPortfolioGrowth } from '../services/api'; // Added getPortfolioGrowth
 
 const DashboardCard: React.FC = () => {
   const { token } = useAuth();
@@ -9,6 +10,10 @@ const DashboardCard: React.FC = () => {
   const [todaysChange, setTodaysChange] = useState("+$0.00 (+0.00%)");
   const [annualReturn, setAnnualReturn] = useState("+0.00%");
   const [cashBalance, setCashBalance] = useState("$0.00");
+
+  // New state for portfolio growth chart
+  const [portfolioGrowthData, setPortfolioGrowthData] = useState<any[]>([]);
+  const [selectedTimeframe, setSelectedTimeframe] = useState<string>('1m'); // Default to 1 month
 
   useEffect(() => {
     const fetchPortfolioSummary = async () => {
@@ -48,50 +53,118 @@ const DashboardCard: React.FC = () => {
     fetchPortfolioSummary();
   }, [token]);
 
+  // New useEffect for fetching portfolio growth data
+  useEffect(() => {
+    const fetchPortfolioGrowth = async () => {
+      if (!token) return;
+      try {
+        const data = await getPortfolioGrowth(token, selectedTimeframe);
+        // Format data for LineChart: convert date strings to Date objects
+        const formattedData = data.map((item: any) => ({
+          ...item,
+          date: new Date(item.date),
+        }));
+        setPortfolioGrowthData(formattedData);
+      } catch (error) {
+        console.error('Failed to fetch portfolio growth data', error);
+      }
+    };
+
+    fetchPortfolioGrowth();
+  }, [token, selectedTimeframe]);
+
+
   // Determine color for Today's Change
   const isPositiveChange = todaysChange.startsWith('+');
   const changeColor = isPositiveChange ? 'success.main' : 'error.main';
   const annualReturnColor = annualReturn.startsWith('+') ? 'success.main' : 'error.main';
 
   return (
-    <Card sx={{ minWidth: 275, mb: 3 }}>
-      <CardContent >
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', width: '100%', flexGrow: 1 }}> 
-          <Box sx={{ width: '25%', flexGrow: 1 }}> 
-            <Typography variant="subtitle2" color="text.secondary">
-              Total Portfolio Value
-            </Typography>
-            <Typography variant="h6" component="div" sx={{ fontSize: '1rem' }}>
-              {totalPortfolioValue}
-            </Typography>
+    <Box> {/* Wrapped in a Box to allow multiple Cards */}
+      <Card sx={{ minWidth: 275, mb: 3 }}>
+        <CardContent >
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', width: '100%', flexGrow: 1 }}>
+            <Box sx={{ width: '25%', flexGrow: 1 }}>
+              <Typography variant="subtitle2" color="text.secondary">
+                Total Portfolio Value
+              </Typography>
+              <Typography variant="h6" component="div" sx={{ fontSize: '1rem' }}>
+                {totalPortfolioValue}
+              </Typography>
+            </Box>
+            <Box sx={{ width: '25%', flexGrow: 1 }}>
+              <Typography variant="subtitle2" color="text.secondary">
+                Today&apos;s Change
+              </Typography>
+              <Typography variant="h6" component="div" sx={{ fontSize: '1rem', color: changeColor }}>
+                {todaysChange}
+              </Typography>
+            </Box>
+            <Box sx={{ width: '25%', flexGrow: 1 }}>
+              <Typography variant="subtitle2" color="text.secondary">
+                Annual Return
+              </Typography>
+              <Typography variant="h6" component="div" sx={{ fontSize: '1rem', color: annualReturnColor }}>
+                {annualReturn}
+              </Typography>
+            </Box>
+            <Box sx={{ width: '25%', flexGrow: 1 }}> {/* Replaced Grid item with Box */}
+              <Typography variant="subtitle2" color="text.secondary">
+                Cash Balance
+              </Typography>
+              <Typography variant="h6" component="div" sx={{ fontSize: '1rem' }}>
+                {cashBalance}
+              </Typography>
+            </Box>
           </Box>
-          <Box sx={{ width: '25%', flexGrow: 1 }}> 
-            <Typography variant="subtitle2" color="text.secondary">
-              Today&apos;s Change
-            </Typography>
-            <Typography variant="h6" component="div" sx={{ fontSize: '1rem', color: changeColor }}>
-              {todaysChange}
-            </Typography>
+        </CardContent>
+      </Card>
+
+      {/* New Card for Portfolio Growth Chart */}
+      <Card sx={{ minWidth: 275, mb: 3 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6" gutterBottom sx={{ mb: 0 }}>Portfolio Growth</Typography>
+            <ButtonGroup variant="outlined" aria-label="timeframe selection" sx={{ gap: '8px' }}>
+              {['1w', '1m', '5y', 'all'].map((timeframe) => (
+                <Button
+                  key={timeframe}
+                  onClick={() => setSelectedTimeframe(timeframe)}
+                  variant={selectedTimeframe === timeframe ? 'contained' : 'outlined'}
+                  sx={{ textTransform: 'none', borderRadius: '20px', minWidth: '60px' }}
+                >
+                  {timeframe.toUpperCase()}
+                </Button>
+              ))}
+            </ButtonGroup>
           </Box>
-          <Box sx={{ width: '25%', flexGrow: 1 }}> 
-            <Typography variant="subtitle2" color="text.secondary">
-              Annual Return
-            </Typography>
-            <Typography variant="h6" component="div" sx={{ fontSize: '1rem', color: annualReturnColor }}>
-              {annualReturn}
-            </Typography>
+          <Box sx={{ height: 300 }}>
+            {portfolioGrowthData.length > 1 ? (
+              <LineChart
+                dataset={portfolioGrowthData}
+                series={[
+                  {
+                    dataKey: 'total_balance',
+                    label: 'Portfolio Value',
+                    valueFormatter: (value) => `${totalPortfolioValue.split(' ')[0]} ${value?.toFixed ? value.toFixed(2) : ''}`, // Use currency from totalPortfolioValue
+                  },
+                ]}
+                xAxis={[{
+                  scaleType: 'time',
+                  dataKey: 'date',
+                  valueFormatter: (date) => new Date(date).toLocaleDateString(),
+                }]}
+                margin={{ left: 70, right: 20, top: 20, bottom: 30 }}
+              />
+            ) : (
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                <Typography variant="body2" color="text.secondary">Not enough data to display portfolio growth.</Typography>
+              </Box>
+            )}
           </Box>
-          <Box sx={{ width: '25%', flexGrow: 1 }}> {/* Replaced Grid item with Box */}
-            <Typography variant="subtitle2" color="text.secondary">
-              Cash Balance
-            </Typography>
-            <Typography variant="h6" component="div" sx={{ fontSize: '1rem' }}>
-              {cashBalance}
-            </Typography>
-          </Box>
-        </Box>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </Box>
   );
 };
 

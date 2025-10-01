@@ -10,7 +10,8 @@ from .views import (
         BalanceSnapshotViewSet,
         get_portfolio_summary,
         get_asset_allocation,
-        get_transaction_summary
+        get_transaction_summary,
+        get_portfolio_growth
     ) 
     
 router = DefaultRouter()
@@ -27,4 +28,5 @@ urlpatterns = [
     path('get_portfolio_summary/', get_portfolio_summary, name='get_portfolio_summary'),
     path('get_asset_allocation/', get_asset_allocation, name='get_asset_allocation'),
     path('get_transaction_summary/', get_transaction_summary, name='get_transaction_summary'), # New endpoint
+    path('get_portfolio_growth/', get_portfolio_growth, name='get_portfolio_growth'),
 ]
