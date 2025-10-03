@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box, Grid, Tabs, Tab } from '@mui/material';
+import { Box,Tabs, Tab } from '@mui/material';
 import AddTransactionCard from '../components/AddTransactionCard';
 import TransactionHistory from '../components/TransactionHistory';
 import Reports from '../components/Reports';

@@ -19,8 +19,12 @@ const LoginPage: React.FC = () => {
             const data = await loginUser({ username, password });
             await login(data.access);
             router.push('/');
-        } catch (error: any) {
-            setError(error.message || 'Login failed. Please try again.');
+        } catch (error: unknown) {
+            if (error instanceof Error) {
+                setError(error.message || 'Login failed. Please try again.');
+            } else {
+                setError('An unknown error occurred.');
+            }
             console.error('Login failed', error);
         } finally {
             setLoading(false);

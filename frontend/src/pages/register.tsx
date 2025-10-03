@@ -24,8 +24,12 @@ const RegisterPage: React.FC = () => {
         try {
             await registerUser({ username, email, password });
             router.push('/login');
-        } catch (error: any) {
-            setError(error.message || 'Registration failed');
+        } catch (error: unknown) {
+            if (error instanceof Error) {
+                setError(error.message || 'Registration failed');
+            } else {
+                setError('An unknown error occurred during registration.');
+            }
             console.error('Registration failed:', error);
         }
     };

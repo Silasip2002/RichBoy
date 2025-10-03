@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import AssetCard from '../components/AssetCard';
@@ -7,10 +6,30 @@ import { getAccounts, getAssets, getAssetDetails } from '../services/api';
 import AssetList from '../components/AssetList';
 import { useAuth } from '../contexts/AuthContext';
 
+interface Asset {
+  id: number;
+  name: string;
+  symbol: string;
+  asset_type: string;
+  price: string | number;
+  quantity: string | number;
+  account: number;
+  cost: string | number;
+  market_price: string | number;
+}
+
+interface Account {
+  id: number;
+  name: string;
+  account_type: string;
+  balance: string;
+  currency: string;
+}
+
 const Assets: React.FC = () => {
   const { token } = useAuth();
-  const [assets, setAssets] = useState<any[]>([]);
-  const [accounts, setAccounts] = useState<any[]>([]);
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const hasFetched = useRef(false);
 
@@ -32,7 +51,7 @@ const Assets: React.FC = () => {
         setLoading(true);
         try {
             const data = await getAssets(token);
-            const assetsWithMarketPrice = await Promise.all(data.results.map(async (asset: any) => {
+            const assetsWithMarketPrice = await Promise.all(data.results.map(async (asset: Asset) => {
                 let market_price = asset.price; // Default to purchase price
                 if ((asset.asset_type === 'stocks' || asset.asset_type === 'crypto') && asset.symbol) {
                     try {

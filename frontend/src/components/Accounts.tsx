@@ -56,6 +56,33 @@ interface AccountsProps {
     onDataChange?: () => void;
 }
 
+interface ApiAccount {
+    id: number;
+    name: string;
+    account_type: string;
+    balance: string;
+    currency: string;
+}
+
+interface ApiTransaction {
+    id: number;
+    date: string;
+    description: string;
+    amount: string;
+    category: string;
+}
+
+interface ApiBalanceSnapshot {
+    id: number;
+    date: string;
+    balance: string;
+    account: number;
+}
+
+interface UserProfile {
+    preferred_currency: string;
+}
+
 const Accounts: React.FC<AccountsProps> = ({ onDataChange }) => {
     const { token } = useAuth();
     const queryClient = useQueryClient();
@@ -96,11 +123,11 @@ const Accounts: React.FC<AccountsProps> = ({ onDataChange }) => {
         queryKey: ['accounts', token],
         queryFn: async () => {
             if (!token) return [];
-            const data = await getAccounts(token);
-            if (Array.isArray(data.results)) {
-                return data.results.map((acc: any) => ({ ...acc, balance: parseFloat(acc.balance) }));
+            const data: { results: ApiAccount[] } | ApiAccount[] = await getAccounts(token);
+            if ('results' in data && Array.isArray(data.results)) {
+                return data.results.map((acc) => ({ ...acc, balance: parseFloat(acc.balance) }));
             } else if (Array.isArray(data)) {
-                return data.map((acc: any) => ({ ...acc, balance: parseFloat(acc.balance) }));
+                return data.map((acc) => ({ ...acc, balance: parseFloat(acc.balance) }));
             }
             console.error('Received data is not an array or paginated response', data);
             return [];
@@ -108,19 +135,20 @@ const Accounts: React.FC<AccountsProps> = ({ onDataChange }) => {
         enabled: !!token,
     });
 
-    const { data: userProfile } = useQuery({
+    const { data: profile } = useQuery<UserProfile>({
         queryKey: ['userProfile', token],
         queryFn: () => getUserProfile(token!),
         enabled: !!token,
-        onSuccess: (profile) => {
-            if (profile && profile.preferred_currency) {
-                setPreferredCurrency(profile.preferred_currency);
-                setInitialPreferredCurrency(profile.preferred_currency);
-            }
-        }
     });
 
-    const fetchAccountDetailsAndActivities = async () => {
+    useEffect(() => {
+        if (profile && profile.preferred_currency) {
+            setPreferredCurrency(profile.preferred_currency);
+            setInitialPreferredCurrency(profile.preferred_currency);
+        }
+    }, [profile]);
+
+    const fetchAccountDetailsAndActivities = React.useCallback(async () => {
         if (!token || !selectedAccount) return;
 
         setDetailsLoading(true);
@@ -131,33 +159,38 @@ const Accounts: React.FC<AccountsProps> = ({ onDataChange }) => {
             setSelectedAccount({ ...accountDetails, balance: parseFloat(accountDetails.balance) });
 
             const transactionData = await getAccountTransactions(token, selectedAccount.id.toString());
-            const transactions = Array.isArray(transactionData.results) ? transactionData.results : (Array.isArray(transactionData) ? transactionData : []);
+            const transactions: ApiTransaction[] = Array.isArray(transactionData.results) ? transactionData.results : (Array.isArray(transactionData) ? transactionData : []);
 
             const snapshotData = await getBalanceSnapshots(token, selectedAccount.id.toString());
-            const snapshots = Array.isArray(snapshotData.results) ? snapshotData.results : (Array.isArray(snapshotData) ? snapshotData : []);
-            setBalanceSnapshots(snapshots.map((s: any) => ({...s, balance: parseFloat(s.balance)})));
+            const snapshots: ApiBalanceSnapshot[] = Array.isArray(snapshotData.results) ? snapshotData.results : (Array.isArray(snapshotData) ? snapshotData : []);
+            setBalanceSnapshots(snapshots.map((s) => ({...s, id: s.id, date: s.date, balance: parseFloat(s.balance)})));
 
             const combinedActivities: Activity[] = [
-                ...transactions.map((t: any) => ({ date: t.date, type: 'transaction' as const, data: { ...t, amount: parseFloat(t.amount) }})),
-                ...snapshots.map((s: any) => ({ date: s.date, type: 'snapshot' as const, data: { ...s, balance: parseFloat(s.balance) }}))
+                ...transactions.map((t) => ({ date: t.date, type: 'transaction' as const, data: { ...t, amount: parseFloat(t.amount) }})),
+                ...snapshots.map((s) => ({ date: s.date, type: 'snapshot' as const, data: { ...s, id: s.id, date: s.date, balance: parseFloat(s.balance) }}))
             ];
 
             combinedActivities.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
             setActivities(combinedActivities);
 
-        } catch (err: any) {
-            setDetailsError(err.message || 'Failed to fetch account data');
+        } catch (err: unknown) {
+            if (err instanceof Error) {
+                setDetailsError(err.message || 'Failed to fetch account data');
+            } else {
+                setDetailsError('An unknown error occurred.');
+            }
         } finally {
             setDetailsLoading(false);
         }
-    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [token, selectedAccount?.id]);
 
     useEffect(() => {
         if (openDetailsDialog) {
             fetchAccountDetailsAndActivities();
         }
-    }, [selectedAccount?.id, openDetailsDialog, token]);
+    }, [openDetailsDialog, fetchAccountDetailsAndActivities]);
 
     const handleOpenAddAccountDialog = () => {
         setOpenAddAccountDialog(true);
@@ -264,8 +297,12 @@ const Accounts: React.FC<AccountsProps> = ({ onDataChange }) => {
             await updateUserProfile(token, { preferred_currency: preferredCurrency });
             setInitialPreferredCurrency(preferredCurrency); // Update initial to reflect saved state
             alert('Preferred currency updated successfully!');
-        } catch (err: any) {
-            setPreferredCurrencyError(err.message || 'Failed to update preferred currency');
+        } catch (err: unknown) {
+            if (err instanceof Error) {
+                setPreferredCurrencyError(err.message || 'Failed to update preferred currency');
+            } else {
+                setPreferredCurrencyError('An unknown error occurred.');
+            }
             console.error('Error updating preferred currency:', err);
         }
     };
@@ -309,8 +346,12 @@ const Accounts: React.FC<AccountsProps> = ({ onDataChange }) => {
                 onDataChange();
             }
             fetchAccountDetailsAndActivities();
-        } catch (err: any) {
-            setRecordBalanceError(err.message || 'Failed to record balance');
+        } catch (err: unknown) {
+            if (err instanceof Error) {
+                setRecordBalanceError(err.message || 'Failed to record balance');
+            } else {
+                setRecordBalanceError('An unknown error occurred.');
+            }
         }
     };
 
@@ -413,7 +454,7 @@ const Accounts: React.FC<AccountsProps> = ({ onDataChange }) => {
                         {accounts.length === 0 ? (
                             <Grid item xs={12}>
                                 <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center', mt: 2 }}>
-                                    No accounts found. Click "Add Account" to create one.
+                                    No accounts found. Click &quot;Add Account&quot; to create one.
                                 </Typography>
                             </Grid>
                         ) : (
@@ -637,7 +678,7 @@ const Accounts: React.FC<AccountsProps> = ({ onDataChange }) => {
             >
                 <DialogTitle>Confirm Deletion</DialogTitle>
                 <DialogContent>
-                    <Typography>Are you sure you want to delete the account "{selectedAccount?.name}"? This action cannot be undone.</Typography>
+                    <Typography>Are you sure you want to delete the account &quot;{selectedAccount?.name}&quot;? This action cannot be undone.</Typography>
                     {deleteAccountMutation.isError && <Alert severity="error" sx={{ mt: 2 }}>{deleteAccountMutation.error.message}</Alert>}
                 </DialogContent>
                 <DialogActions>
@@ -708,7 +749,7 @@ const Accounts: React.FC<AccountsProps> = ({ onDataChange }) => {
                                                             valueFormatter: (date) => new Date(date).toLocaleDateString(),
                                                         }]}
                                                         yAxis={[{
-                                                            valueFormatter: (value: number) => {
+                                                            valueFormatter: (value: number | null) => {
                                                                 if (value == null) return '';
                                                                 const currency = selectedAccount?.currency ?? '';
                                                                 const absValue = Math.abs(value);
@@ -741,7 +782,7 @@ const Accounts: React.FC<AccountsProps> = ({ onDataChange }) => {
                                             <List>
                                                 {activities.length > 0 ? (
                                                     activities.map((activity, index) => (
-                                                        <React.Fragment key={`${activity.type}-${(activity.data as any).id}`}>
+                                                        <React.Fragment key={`${activity.type}-${(activity.data as Transaction | BalanceSnapshot).id}`}>
                                                             <ListItem sx={{ py: 1.5 }}>
                                                                 {activity.type === 'transaction' ? (
                                                                     <>

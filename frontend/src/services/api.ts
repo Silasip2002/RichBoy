@@ -1,5 +1,75 @@
 const API_BASE_URL = 'http://localhost:8000/api';
 
+interface TransactionData {
+    transaction_type: string;
+    amount: string;
+    currency: string;
+    description: string;
+    category: string;
+    date: string;
+    is_recurring: boolean;
+    account: number;
+}
+
+interface AccountData {
+    name: string;
+    account_type: string;
+    balance: string | number;
+    currency: string;
+}
+
+interface AssetData {
+    name: string;
+    symbol: string;
+    asset_type: string;
+    price: string;
+    quantity: string;
+    account: number | '';
+    cost: string;
+}
+
+interface BalanceSnapshotData {
+    account: number;
+    balance: number;
+    date: string;
+}
+
+interface UserProfileData {
+    preferred_currency: string;
+}
+
+interface Transaction {
+    id: number;
+    date: string;
+    description: string;
+    amount: number;
+    category: string;
+    transaction_type: string;
+    is_recurring: boolean;
+    account: number;
+    currency: string;
+}
+
+interface Account {
+  id: number;
+  name: string;
+  account_type: string;
+  balance: number;
+  currency: string;
+}
+
+interface Asset {
+    id: number;
+    name: string;
+    symbol: string;
+    asset_type: string;
+    price: string | number;
+    quantity: string | number;
+    account: number;
+    cost: string | number;
+    market_price: string | number;
+  }
+
 const getAuthHeaders = (token: string) => {
     return {
         'Content-Type': 'application/json',
@@ -17,7 +87,7 @@ export const getTransactions = async (token: string, params: URLSearchParams) =>
     return response.json();
 };
 
-export const createTransaction = async (token: string, transactionData: any) => {
+export const createTransaction = async (token: string, transactionData: TransactionData) => {
     const response = await fetch(`${API_BASE_URL}/transactions/`, {
         method: 'POST',
         headers: getAuthHeaders(token),
@@ -40,7 +110,7 @@ export const getAccounts = async (token: string) => {
     return response.json();
 };
 
-export const createAccount = async (token: string, accountData: any) => {
+export const createAccount = async (token: string, accountData: AccountData) => {
     const response = await fetch(`${API_BASE_URL}/accounts/`, {
         method: 'POST',
         headers: getAuthHeaders(token),
@@ -53,7 +123,7 @@ export const createAccount = async (token: string, accountData: any) => {
     return response.json();
 };
 
-export const updateAccount = async (token: string, accountId: number, accountData: any) => {
+export const updateAccount = async (token: string, accountId: number, accountData: Partial<Account>) => {
     const response = await fetch(`${API_BASE_URL}/accounts/${accountId}/`, {
         method: 'PUT',
         headers: getAuthHeaders(token),
@@ -104,7 +174,7 @@ export const getAccountTransactions = async (token: string, id: string) => {
     return response.json();
 };
 
-export const createAsset = async (token: string, assetData: any) => {
+export const createAsset = async (token: string, assetData: AssetData) => {
     const response = await fetch(`${API_BASE_URL}/assets/`, {
         method: 'POST',
         headers: getAuthHeaders(token),
@@ -116,7 +186,7 @@ export const createAsset = async (token: string, assetData: any) => {
     }
     return response.json();
 }
-export const createBalanceSnapshot = async (token: string, data: any) => {
+export const createBalanceSnapshot = async (token: string, data: BalanceSnapshotData) => {
     const response = await fetch(`${API_BASE_URL}/balance-snapshots/`, {
         method: 'POST',
         headers: getAuthHeaders(token),
@@ -129,7 +199,7 @@ export const createBalanceSnapshot = async (token: string, data: any) => {
     return response.json();
 };
 
-export const updateAsset = async (token: string, assetId: number, assetData: any) => {
+export const updateAsset = async (token: string, assetId: number, assetData: Partial<Asset>) => {
     const response = await fetch(`${API_BASE_URL}/assets/${assetId}/`, {
         method: 'PUT',
         headers: getAuthHeaders(token),
@@ -185,7 +255,7 @@ export const searchSymbols = async (token: string, keywords: string, assetType: 
 };
 
 export const getAllTransactions = async (token: string) => {
-    let allTransactions: any[] = [];
+    let allTransactions: Transaction[] = [];
     let page = 1;
     while (true) {
         const response = await fetch(`${API_BASE_URL}/transactions/?page=${page}&page_size=100`, {
@@ -215,7 +285,7 @@ export const getUserProfile = async (token: string) => {
     return response.json();
 };
 
-export const updateUserProfile = async (token: string, profileData: any) => {
+export const updateUserProfile = async (token: string, profileData: UserProfileData) => {
     const response = await fetch(`${API_BASE_URL}/users/profile/`, {
         method: 'PUT',
         headers: getAuthHeaders(token),
@@ -228,7 +298,7 @@ export const updateUserProfile = async (token: string, profileData: any) => {
     return response.json();
 };
 
-export const loginUser = async (credentials: any) => {
+export const loginUser = async (credentials: Record<string, string>) => {
     const response = await fetch(`${API_BASE_URL}/users/login/`, {
         method: 'POST',
         headers: {
@@ -243,7 +313,7 @@ export const loginUser = async (credentials: any) => {
     return response.json();
 };
 
-export const registerUser = async (userInfo: any) => {
+export const registerUser = async (userInfo: Record<string, string>) => {
     const response = await fetch(`${API_BASE_URL}/users/register/`, {
         method: 'POST',
         headers: {
@@ -298,7 +368,7 @@ export const getBalanceSnapshots = async (token: string, accountId: string) => {
     return response.json();
 };
 
-export const updateBalanceSnapshot = async (token: string, id: string, data: any) => {
+export const updateBalanceSnapshot = async (token: string, id: string, data: Partial<BalanceSnapshotData>) => {
     const response = await fetch(`${API_BASE_URL}/balance-snapshots/${id}/`, {
         method: 'PUT',
         headers: getAuthHeaders(token),

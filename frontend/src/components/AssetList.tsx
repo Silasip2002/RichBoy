@@ -1,11 +1,34 @@
-import React, { useEffect } from 'react';
-import { Card, CardContent, Box, Typography, TextField, Select, MenuItem, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Chip, Autocomplete, Skeleton } from '@mui/material';
+import React from 'react';
+import { Card, CardContent, Box, Typography, TextField, Select, MenuItem, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Chip, Autocomplete, Skeleton } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useAuth } from '../contexts/AuthContext';
 import { updateAsset, deleteAsset, createAsset, getAssetDetails, searchSymbols } from '../services/api';
 
-const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetStateAction<any[]>>, accounts: any[], setAccounts: React.Dispatch<React.SetStateAction<any[]>>, loading: boolean }> = ({ assets, setAssets, accounts, setAccounts, loading }) => {
+interface Asset {
+  id: number;
+  name: string;
+  symbol: string;
+  asset_type: string;
+  price: string | number;
+  quantity: string | number;
+  account: number;
+  cost: string | number;
+  market_price: string | number;
+}
+
+interface Account {
+  id: number;
+  name: string;
+  currency: string;
+}
+
+interface SymbolSearchItem {
+  symbol: string;
+  name: string;
+}
+
+const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.SetStateAction<Asset[]>>, accounts: Account[], loading: boolean }> = ({ assets, setAssets, accounts, loading }) => {
   const { token } = useAuth();
   const [open, setOpen] = React.useState(false);
   const [newAsset, setNewAsset] = React.useState<{
@@ -20,7 +43,7 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
   
   
   const [editAssetOpen, setEditAssetOpen] = React.useState(false);
-  const [editingAsset, setEditingAsset] = React.useState<any | null>(null);
+  const [editingAsset, setEditingAsset] = React.useState<Asset | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false);
   const [deletingAssetId, setDeletingAssetId] = React.useState<number | null>(null);
   const [errors, setErrors] = React.useState<{ [key: string]: string }>({});
@@ -55,7 +78,7 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
     setErrors({});
   };
 
-  const validate = (asset: any) => {
+  const validate = (asset: Partial<Asset>) => {
     const newErrors: { [key: string]: string } = {};
     if (!asset.name) newErrors.name = 'Asset name is required';
     if (!asset.price) newErrors.price = 'Price is required';
@@ -66,7 +89,7 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
     return newErrors;
   };
 
-  const handleEditClick = (asset: any) => {
+  const handleEditClick = (asset: Asset) => {
     setEditingAsset({ 
       ...asset, 
       price: asset.quantity > 0 ? (asset.cost / asset.quantity).toFixed(2) : '0.00',
@@ -166,6 +189,7 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
             setErrors({ ...errors, symbol: 'Could not fetch price' });
         }
     } catch (error) {
+        console.error('Failed to fetch price', error);
         setErrors({ ...errors, symbol: 'Failed to fetch price' });
     }
   };
@@ -174,10 +198,12 @@ const AssetList: React.FC<{ assets: any[], setAssets: React.Dispatch<React.SetSt
     if (keywords.length > 1 && token) {
         try {
             const data = await searchSymbols(token, keywords, newAsset.asset_type);
-            setSymbolOptions(data.map((item: any) => ({ label: `${item.symbol} - ${item.name}`, value: item.symbol, name: item.name })));
-        } catch (error: any) {
+            setSymbolOptions(data.map((item: SymbolSearchItem) => ({ label: `${item.symbol} - ${item.name}`, value: item.symbol, name: item.name })));
+        } catch (error: unknown) {
             console.error('Failed to search symbols', error);
-            setErrors({ ...errors, symbol: error.message });
+            if (error instanceof Error) {
+                setErrors({ ...errors, symbol: error.message });
+            }
         }
     } else {
         setSymbolOptions([]);

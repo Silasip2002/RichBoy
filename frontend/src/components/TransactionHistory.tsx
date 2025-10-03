@@ -19,7 +19,7 @@ import {
     Select,
     MenuItem,
 } from '@mui/material';
-import { getAllTransactions, getTransactionSummary } from '../services/api';
+import { getTransactionSummary } from '../services/api';
 
 interface Transaction {
     id: number;

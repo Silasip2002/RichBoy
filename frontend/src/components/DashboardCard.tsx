@@ -4,6 +4,16 @@ import { LineChart } from '@mui/x-charts/LineChart'; // Added LineChart
 import { useAuth } from '../contexts/AuthContext';
 import { getPortfolioSummary, getPortfolioGrowth } from '../services/api'; // Added getPortfolioGrowth
 
+interface PortfolioGrowthData {
+  date: Date;
+  total_balance: number;
+}
+
+interface PortfolioGrowthAPIResponseItem {
+  date: string;
+  total_balance: number;
+}
+
 const DashboardCard: React.FC = () => {
   const { token } = useAuth();
   const [totalPortfolioValue, setTotalPortfolioValue] = useState("$0.00");
@@ -12,7 +22,7 @@ const DashboardCard: React.FC = () => {
   const [cashBalance, setCashBalance] = useState("$0.00");
 
   // New state for portfolio growth chart
-  const [portfolioGrowthData, setPortfolioGrowthData] = useState<any[]>([]);
+  const [portfolioGrowthData, setPortfolioGrowthData] = useState<PortfolioGrowthData[]>([]);
   const [selectedTimeframe, setSelectedTimeframe] = useState<string>('1m'); // Default to 1 month
 
   useEffect(() => {
@@ -60,7 +70,7 @@ const DashboardCard: React.FC = () => {
       try {
         const data = await getPortfolioGrowth(token, selectedTimeframe);
         // Format data for LineChart: convert date strings to Date objects
-        const formattedData = data.map((item: any) => ({
+        const formattedData = data.map((item: PortfolioGrowthAPIResponseItem) => ({
           ...item,
           date: new Date(item.date),
         }));

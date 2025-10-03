@@ -1,17 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import {
-  Box,
   Button,
   Card,
   CardContent,
-  FormControl,
   FormControlLabel,
   Grid,
   MenuItem,
-  Radio,
-  RadioGroup,
-  Select,
   Switch,
   TextField,
   Typography,
@@ -28,9 +23,7 @@ import {
   AddCircleOutline,
   RemoveCircleOutline,
   AttachMoney,
-  AccountBalanceWalletOutlined,
   DescriptionOutlined,
-  LocalOfferOutlined,
   CalendarTodayOutlined,
 } from '@mui/icons-material';
 import constants from '../data/constants.json';
@@ -63,27 +56,26 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
   const [newAccountBalance, setNewAccountBalance] = useState('');
   const [newAccountCurrency, setNewAccountCurrency] = useState(constants.currencies[0].value);
 
-  const fetchAccounts = async () => {
-    if (!token) return;
-    try {
-      const data = await getAccounts(token);
-      if (data && Array.isArray(data.results)) {
-        setAccounts(data.results);
-      } else if (Array.isArray(data)) {
-        setAccounts(data);
-      } else {
-        console.error('Received data is not an array or paginated response');
-        setAccounts([]); // Ensure accounts is always an array
+    const fetchAccounts = useCallback(async () => {
+      if (!token) return;
+      try {
+        const data = await getAccounts(token);
+        if (data && Array.isArray(data.results)) {
+          setAccounts(data.results);
+        } else if (Array.isArray(data)) {
+          setAccounts(data);
+        } else {
+          console.error('Received data is not an array or paginated response');
+          setAccounts([]); // Ensure accounts is always an array
+        }
+      } catch (error) {
+        console.error('Error fetching accounts:', error);
       }
-    } catch (error) {
-      console.error('Error fetching accounts:', error);
-    }
-  };
-
-  useEffect(() => {
-    fetchAccounts();
-  }, [token]);
-
+    }, [token]);
+  
+    useEffect(() => {
+      fetchAccounts();
+    }, [fetchAccounts]);
   const currentCategories = transactionType === 'income' ? constants.transactionCategories.income : constants.transactionCategories.expense;
 
   const handleTransactionTypeChange = (event: React.MouseEvent<HTMLElement>, newType: string) => {
