@@ -5,6 +5,10 @@ class TransactionSerializer(serializers.ModelSerializer):
     user = serializers.ReadOnlyField(source='user.username')
     currency = serializers.ChoiceField(choices=CURRENCY_CHOICES)
 
+    class Meta:
+        model = Transaction
+        fields = '__all__'
+
     def validate_account(self, value):
         """Check that the account belongs to the current user."""
         if value.user != self.context['request'].user:

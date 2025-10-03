@@ -40,7 +40,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
         category = self.request.query_params.get('category')
         if category and category != 'all':
-            queryset = queryset.filter(category__name=category)
+            queryset = queryset.filter(category=category)
 
         transaction_type = self.request.query_params.get('transaction_type')
         if transaction_type and transaction_type != 'all':
