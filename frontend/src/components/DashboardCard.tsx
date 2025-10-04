@@ -7,6 +7,7 @@ import { getPortfolioSummary, getPortfolioGrowth } from '../services/api'; // Ad
 interface PortfolioGrowthData {
   date: Date;
   total_balance: number;
+  [key: string]: Date | number;
 }
 
 interface PortfolioGrowthAPIResponseItem {

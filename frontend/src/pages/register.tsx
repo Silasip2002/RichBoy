@@ -52,7 +52,7 @@ const RegisterPage: React.FC = () => {
                 </Typography>
                 <Box component="form" onSubmit={handleRegister} noValidate sx={{ mt: 3 }}>
                     <Grid container spacing={2}>
-                        <Grid item xs={12} width={"100%"}>
+                        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                             <TextField
                                 required
                                 fullWidth
@@ -64,7 +64,7 @@ const RegisterPage: React.FC = () => {
                                 onChange={(e) => setUsername(e.target.value)}
                             />
                         </Grid>
-                        <Grid item xs={12} width={"100%"}>
+                        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                             <TextField
                                 required
                                 fullWidth
@@ -76,7 +76,7 @@ const RegisterPage: React.FC = () => {
                                 onChange={(e) => setEmail(e.target.value)}
                             />
                         </Grid>
-                        <Grid item xs={12} width={"100%"}>
+                        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                             <TextField
                                 required
                                 fullWidth
@@ -89,7 +89,7 @@ const RegisterPage: React.FC = () => {
                                 onChange={(e) => setPassword(e.target.value)}
                             />
                         </Grid>
-                        <Grid item xs={12} width={"100%"}>
+                        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                             <TextField
                                 required
                                 fullWidth
@@ -112,7 +112,7 @@ const RegisterPage: React.FC = () => {
                         Sign Up
                     </Button>
                     <Grid container justifyContent="flex-end">
-                        <Grid item>
+                        <Grid  size={{ xs: 12 }}>
                             <Link href="/login" variant="body2" onClick={(e) => { e.preventDefault(); router.push('/login'); }}>
                                 Already have an account? Sign in
                             </Link>

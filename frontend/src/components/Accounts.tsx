@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
+
+interface AccountsProps {
+    onDataChange?: () => void;
+}
+
 import {
     Box, Button, Card, CardContent, Typography, Grid,
     Dialog, DialogTitle, DialogContent, DialogActions,
@@ -17,8 +22,7 @@ import {
     Delete as DeleteIcon,
     TrendingUp as TrendingUpIcon,
     MonetizationOn as MonetizationOnIcon,
-    AccountBalance as AccountBalanceIcon,
-    CreditScore as CreditScoreIcon,
+    AccountBalance as AccountBalanceIcon
 } from '@mui/icons-material';
 import { LineChart } from '@mui/x-charts/LineChart';
 import constants from '../data/constants.json';
@@ -451,81 +455,79 @@ const Accounts: React.FC<AccountsProps> = ({ onDataChange }) => {
                     </Box>
 
                     <Grid container spacing={2}>
-                        {accounts.length === 0 ? (
-                            <Grid item xs={12}>
+                        {accounts.length === 0 && (
+                            <Grid size={{ xs: 12 }}>
                                 <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center', mt: 2 }}>
                                     No accounts found. Click &quot;Add Account&quot; to create one.
                                 </Typography>
                             </Grid>
-                        ) : (
-                            accounts.map((account) => (
-                                <Grid item xs={12} sm={6} md={4} key={account.id}>
-                                    <Card
-                                        onClick={() => handleCardClick(account)}
-                                        sx={{
-                                            p: 2,
-                                            borderRadius: '8px',
-                                            border: account.account_type === 'cash' ? '1px solid #a7d9b5' : account.account_type === 'bank' ? '1px solid #a2d2ff' : account.account_type === 'credit_card' ? '1px solid #d8b2ff' : account.account_type === 'investment' ? '1px solid #ffc107' : account.account_type === 'crypto' ? '1px solid #fd7e14' : account.account_type === 'bond' ? '1px solid #6610f2' : '1px solid #20c997',
-                                            bgcolor: account.account_type === 'cash' ? '#e6ffe6' : account.account_type === 'bank' ? '#e0f2ff' : account.account_type === 'credit_card' ? '#f5e6ff' : account.account_type === 'investment' ? '#fff8e1' : account.account_type === 'crypto' ? '#fff3e0' : account.account_type === 'bond' ? '#f1e6ff' : '#e6fff9',
-                                            cursor: 'pointer',
-                                            '&:hover': {
-                                                boxShadow: '0 4px 20px 0 rgba(0, 0, 0, 0.1)',
-                                                transform: 'scale(1.02)'
-                                            },
-                                            transition: 'box-shadow 0.3s ease, transform 0.3s ease',
-                                            position: 'relative',
-                                        }}>
-                                        <CardContent>
-                                            <Box sx={{ position: 'absolute', top: 0, right: 0 }}>
-                                                <IconButton
-                                                    aria-label="more"
-                                                    onClick={(e) => handleMenuClick(e, account)}
-                                                >
-                                                    <MoreVertIcon />
-                                                </IconButton>
-                                            </Box>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                                {account.account_type === 'cash' && (
-                                                    <AttachMoneyIcon sx={{ color: '#28a745', mr: 1 }} />
-                                                )}
-                                                {account.account_type === 'bank' && (
-                                                    <AccountBalanceWalletOutlinedIcon sx={{ color: '#007bff', mr: 1 }} />
-                                                )}
-                                                {account.account_type === 'credit_card' && (
-                                                    <CreditCardIcon sx={{ color: '#6f42c1', mr: 1 }} />
-                                                )}
-                                                {account.account_type === 'investment' && (
-                                                    <TrendingUpIcon sx={{ color: '#ffc107', mr: 1 }} />
-                                                )}
-                                                {account.account_type === 'crypto' && (
-                                                    <MonetizationOnIcon sx={{ color: '#fd7e14', mr: 1 }} />
-                                                )}
-                                                {account.account_type === 'bond' && (
-                                                    <AccountBalanceIcon sx={{ color: '#6610f2', mr: 1 }} />
-                                                )}
-                                                {account.account_type === 'loan' && (
-                                                    <CreditScoreIcon sx={{ color: '#20c997', mr: 1 }} />
-                                                )}
-                                                <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>{account.name}</Typography>
-                                            </Box>
-                                            <Typography
-                                                variant="h5"
-                                                sx={{
-                                                    fontWeight: 'semibold',
-                                                    color: account.balance >= 0 ? '#28a745' : '#dc3545',
-                                                }}
+                        )}
+                        {accounts.map((account) => (
+                            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={account.id}>
+                                <Card
+                                    onClick={() => handleCardClick(account)}
+                                    sx={{
+                                        p: 2,
+                                        borderRadius: '8px',
+                                        border: account.account_type === 'cash' ? '1px solid #a7d9b5' : account.account_type === 'bank' ? '1px solid #a2d2ff' : account.account_type === 'credit_card' ? '1px solid #d8b2ff' : account.account_type === 'investment' ? '1px solid #ffc107' : account.account_type === 'crypto' ? '1px solid #fd7e14' : account.account_type === 'bond' ? '1px solid #6610f2' : '1px solid #20c997',
+                                        bgcolor: account.account_type === 'cash' ? '#e6ffe6' : account.account_type === 'bank' ? '#e0f2ff' : account.account_type === 'credit_card' ? '#f5e6ff' : account.account_type === 'investment' ? '#fff8e1' : account.account_type === 'crypto' ? '#fff3e0' : account.account_type === 'bond' ? '#f1e6ff' : '#e6fff9',
+                                        cursor: 'pointer',
+                                        '&:hover': {
+                                            boxShadow: '0 4px 20px 0 rgba(0, 0, 0, 0.1)',
+                                            transform: 'scale(1.02)'
+                                        },
+                                        transition: 'box-shadow 0.3s ease, transform 0.3s ease',
+                                        position: 'relative',
+                                    }}>
+                                    <CardContent>
+                                        <Box sx={{ position: 'absolute', top: 0, right: 0 }}>
+                                            <IconButton
+                                                aria-label="more"
+                                                onClick={(e) => handleMenuClick(e, account)}
                                             >
-                                                {account.currency} {account.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 } )}
-                                            </Typography>
-                                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                                {constants.accountTypes.find(at => at.value === account.account_type)?.label || account.account_type}
-                                            </Typography>
-                                        </CardContent>
-                                    </Card>
-                                </Grid>
-                            ))
-                        )
-                    }
+                                                <MoreVertIcon />
+                                            </IconButton>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                                            {account.account_type === 'cash' && (
+                                                <AttachMoneyIcon sx={{ color: '#28a745', mr: 1 }} />
+                                            )}
+                                            {account.account_type === 'bank' && (
+                                                <AccountBalanceWalletOutlinedIcon sx={{ color: '#007bff', mr: 1 }} />
+                                            )}
+                                            {account.account_type === 'credit_card' && (
+                                                <CreditCardIcon sx={{ color: '#6f42c1', mr: 1 }} />
+                                            )}
+                                            {account.account_type === 'investment' && (
+                                                <TrendingUpIcon sx={{ color: '#ffc107', mr: 1 }} />
+                                            )}
+                                            {account.account_type === 'crypto' && (
+                                                <MonetizationOnIcon sx={{ color: '#fd7e14', mr: 1 }} />
+                                            )}
+                                            {account.account_type === 'bond' && (
+                                                <AccountBalanceIcon sx={{ color: '#6610f2', mr: 1 }} />
+                                            )}
+                                            {account.account_type === 'loan' && (
+                                                <CreditCardIcon sx={{ color: '#20c997', mr: 1 }} />
+                                            )}
+                                            <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>{account.name}</Typography>
+                                        </Box>
+                                        <Typography
+                                            variant="h5"
+                                            sx={{
+                                                fontWeight: 'semibold',
+                                                color: account.balance >= 0 ? '#28a745' : '#dc3545',
+                                            }}
+                                        >
+                                            {account.currency} {account.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 } )}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                            {constants.accountTypes.find(at => at.value === account.account_type)?.label || account.account_type}
+                                        </Typography>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                        ))}
                     </Grid>
                 </CardContent>
             </Card>
@@ -708,7 +710,7 @@ const Accounts: React.FC<AccountsProps> = ({ onDataChange }) => {
                                     <Card sx={{ mb: 3, borderRadius: '16px', boxShadow: 1 }}>
                                         <CardContent sx={{ p: 3 }}>
                                             <Grid container spacing={2} alignItems="center">
-                                                <Grid item xs={12} sm={6}>
+                                                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                                                     <Typography variant="h6">Balance: {selectedAccount.currency} {selectedAccount.balance.toFixed(2)}</Typography>
                                                     <Typography variant="body1" color="text.secondary">Account Type: {constants.accountTypes.find(at => at.value === selectedAccount.account_type)?.label || selectedAccount.account_type}</Typography>
                                                 </Grid>

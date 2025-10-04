@@ -6,25 +6,7 @@ import { getAccounts, getAssets, getAssetDetails } from '../services/api';
 import AssetList from '../components/AssetList';
 import { useAuth } from '../contexts/AuthContext';
 
-interface Asset {
-  id: number;
-  name: string;
-  symbol: string;
-  asset_type: string;
-  price: string | number;
-  quantity: string | number;
-  account: number;
-  cost: string | number;
-  market_price: string | number;
-}
-
-interface Account {
-  id: number;
-  name: string;
-  account_type: string;
-  balance: string;
-  currency: string;
-}
+import { Asset, Account } from '../types/asset';
 
 const Assets: React.FC = () => {
   const { token } = useAuth();
@@ -106,21 +88,26 @@ const Assets: React.FC = () => {
     value: value.toFixed(2),
   }));
 
-  const allCards = [{ title: 'Total Asset Value', value: totalAssetValue }, ...assetCards];
+  // Get the first account's currency or default to USD
+  const defaultCurrency = accounts[0]?.currency || 'USD';
+  const allCards = [
+    { title: 'Total Asset Value', value: totalAssetValue, currency: defaultCurrency },
+    ...assetCards.map(card => ({ ...card, currency: defaultCurrency }))
+  ];
 
   return (
     <div> 
       <Box sx={{ mt: 3 }}>
         <Grid container spacing={2} sx={{ mt: 3 }}>
           {allCards.map((asset, index) => (
-            <Grid item xs={12} sm={6} md={3} key={index} sx={{ display: 'flex' }}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }} key={index} sx={{ display: 'flex' }}>
               <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <AssetCard title={asset.title} value={asset.value} />
+                <AssetCard title={asset.title} value={parseFloat(asset.value)} currency={asset.currency} />
               </Box>
             </Grid>
           ))}
         </Grid>
-        <AssetList assets={assets} setAssets={setAssets} accounts={accounts} setAccounts={setAccounts} loading={loading} />
+        <AssetList assets={assets} setAssets={setAssets} accounts={accounts} loading={loading} />
       </Box>
     </div>
   );

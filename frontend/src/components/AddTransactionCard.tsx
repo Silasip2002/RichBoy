@@ -148,7 +148,7 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
             Add New Transaction
           </Typography>
           <Grid container spacing={3}>
-            <Grid item xs={12} width={"100%"}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <ToggleButtonGroup
                 value={transactionType}
                 exclusive
@@ -183,7 +183,7 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
                 </ToggleButton>
               </ToggleButtonGroup>
             </Grid>
-            <Grid item xs={12} width={"100%"}>
+            <Grid >
               <TextField
                 label="Amount"
                 variant="outlined"
@@ -200,7 +200,7 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
                 }}
               />
             </Grid>
-            <Grid item xs={12} width={"100%"}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <TextField
                 select
                 label="Currency"
@@ -215,7 +215,7 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
                 ))}
               </TextField>
             </Grid>
-            <Grid item xs={12} width={"100%"}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <TextField
                 label="Description"
                 variant="outlined"
@@ -231,7 +231,7 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
                 }}
               />
             </Grid>
-            <Grid item xs={12} width={"100%"}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Button onClick={handleOpenAccountDialog}
                 sx={{ minWidth: 0, px: 1, float: 'right' }}
                 size='small'
@@ -251,7 +251,7 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
                 ))}
               </TextField>
             </Grid>
-            <Grid item xs={12} width={"100%"}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <TextField
                 select
                 label="Category"
@@ -267,7 +267,7 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
                 ))}
               </TextField>
             </Grid>
-            <Grid item xs={12} width={"100%"}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <TextField
                 label="Date"
                 variant="outlined"
@@ -284,14 +284,14 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
                 }}
               />
             </Grid>
-            <Grid item xs={12} width={"100%"}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <FormControlLabel
                 control={<Switch checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} color="primary" />}
                 label="Recurring transaction"
                 sx={{ width: '100%' }}
               />
             </Grid>
-            <Grid item xs={12} width={"100%"}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Button variant="contained" color="primary" onClick={handleSaveTransaction} fullWidth sx={{ py: 1.5, textTransform: 'none', borderRadius: '8px', fontWeight: 600 }}>
                 Add Transaction
               </Button>
