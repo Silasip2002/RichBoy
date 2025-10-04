@@ -147,95 +147,83 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
           <Typography variant="h5" sx={{ fontWeight: 700, color: '#333', mb: 3, textAlign: 'center' }}>
             Add New Transaction
           </Typography>
-          <Grid container spacing={3}>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <ToggleButtonGroup
-                value={transactionType}
-                exclusive
-                onChange={handleTransactionTypeChange}
-                fullWidth
-                sx={{
-                  display: 'flex',
-                  gap: 2,
-                  '& .MuiToggleButton-root': {
-                    color: '#888',
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    borderRadius: '8px',
-                    border: '1px solid #ddd',
-                    '&.Mui-selected': {
-                      color: 'white',
-                      backgroundColor: transactionType === 'income' ? '#4caf50' : '#f44336',
-                      '&:hover': {
-                        backgroundColor: transactionType === 'income' ? '#43a047' : '#e53935',
-                      }
+          <div style={{"display":"flex","flexDirection":"column","gap":"1rem"}}>
+            <ToggleButtonGroup
+              value={transactionType}
+              exclusive
+              onChange={handleTransactionTypeChange}
+              fullWidth
+              sx={{
+                display: 'flex',
+                gap: 2,
+                '& .MuiToggleButton-root': {
+                  color: '#888',
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  borderRadius: '8px',
+                  border: '1px solid #ddd',
+                  '&.Mui-selected': {
+                    color: 'white',
+                    backgroundColor: transactionType === 'income' ? '#4caf50' : '#f44336',
+                    '&:hover': {
+                      backgroundColor: transactionType === 'income' ? '#43a047' : '#e53935',
                     }
                   }
-                }}
-              >
-                <ToggleButton value="expense">
-                  <RemoveCircleOutline sx={{ mr: 1 }} />
-                  Expense
-                </ToggleButton>
-                <ToggleButton value="income">
-                  <AddCircleOutline sx={{ mr: 1 }} />
-                  Income
-                </ToggleButton>
-              </ToggleButtonGroup>
-            </Grid>
-            <Grid >
-              <TextField
-                label="Amount"
-                variant="outlined"
-                fullWidth
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <AttachMoney />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <TextField
-                select
-                label="Currency"
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                fullWidth
-              >
-                {constants.currencies.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <TextField
-                label="Description"
-                variant="outlined"
-                fullWidth
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <DescriptionOutlined />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <Button onClick={handleOpenAccountDialog}
-                sx={{ minWidth: 0, px: 1, float: 'right' }}
-                size='small'
-              >+Add Account</Button>
+                }
+              }}
+            >
+              <ToggleButton value="expense">
+                <RemoveCircleOutline sx={{ mr: 1 }} />
+                Expense
+              </ToggleButton>
+              <ToggleButton value="income">
+                <AddCircleOutline sx={{ mr: 1 }} />
+                Income
+              </ToggleButton>
+            </ToggleButtonGroup>
+            <TextField
+              label="Amount"
+              variant="outlined"
+              fullWidth
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <AttachMoney />
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <TextField
+              select
+              label="Currency"
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              fullWidth
+            >
+              {constants.currencies.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              label="Description"
+              variant="outlined"
+              fullWidth
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <DescriptionOutlined />
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <div style={{ "position": "relative" }}>
               <TextField
                 select
                 label="Account"
@@ -250,53 +238,49 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
                   </MenuItem>
                 ))}
               </TextField>
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <TextField
-                select
-                label="Category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                fullWidth
-              >
-                <MenuItem value="" disabled>Select a category</MenuItem>
-                {currentCategories.map((cat) => (
-                  <MenuItem key={cat.value} value={cat.value}>
-                    {cat.label}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <TextField
-                label="Date"
-                variant="outlined"
-                fullWidth
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <CalendarTodayOutlined />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <FormControlLabel
-                control={<Switch checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} color="primary" />}
-                label="Recurring transaction"
-                sx={{ width: '100%' }}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <Button variant="contained" color="primary" onClick={handleSaveTransaction} fullWidth sx={{ py: 1.5, textTransform: 'none', borderRadius: '8px', fontWeight: 600 }}>
-                Add Transaction
-              </Button>
-            </Grid>
-          </Grid>
+              <Button onClick={handleOpenAccountDialog}
+                sx={{ minWidth: 0, px: 1, position: 'absolute', right: '35px', top: '50%', transform: 'translateY(-50%)' }}
+                size='small'
+              >+Add Account</Button>
+            </div>
+            <TextField
+              select
+              label="Category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              fullWidth
+            >
+              <MenuItem value="" disabled>Select a category</MenuItem>
+              {currentCategories.map((cat) => (
+                <MenuItem key={cat.value} value={cat.value}>
+                  {cat.label}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              label="Date"
+              variant="outlined"
+              fullWidth
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <CalendarTodayOutlined />
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <FormControlLabel
+              control={<Switch checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} color="primary" />}
+              label="Recurring transaction"
+              sx={{ width: '100%' }}
+            />
+            <Button variant="contained" color="primary" onClick={handleSaveTransaction} fullWidth sx={{ py: 1.5, textTransform: 'none', borderRadius: '8px', fontWeight: 600 }}>
+              Add Transaction
+            </Button>
+          </div>
         </CardContent>
       </Card>
       <Dialog open={openAccountDialog} onClose={handleCloseAccountDialog}>
