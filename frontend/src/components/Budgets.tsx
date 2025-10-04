@@ -65,6 +65,7 @@ const Budgets = () => {
     const [category, setCategory] = useState('');
     const [amount, setAmount] = useState('');
     const [period, setPeriod] = useState('Month');
+    const [currency, setCurrency] = useState('USD');
     const [budgets, setBudgets] = useState<Budget[]>(budgetsData);
     const [filter, setFilter] = useState('All');
 
@@ -82,7 +83,7 @@ const Budgets = () => {
                 category,
                 budgeted: parseFloat(amount),
                 spent: 0,
-                currency: 'USD', // Default currency
+                currency,
                 period,
             };
             setBudgets([...budgets, newBudget]);
@@ -90,6 +91,7 @@ const Budgets = () => {
             setCategory('');
             setAmount('');
             setPeriod('Month');
+            setCurrency('USD');
         }
     };
 
@@ -184,6 +186,18 @@ const Budgets = () => {
                         value={amount}
                         onChange={(e) => setAmount(e.target.value)}
                     />
+                    <FormControl fullWidth margin="dense">
+                        <InputLabel>Currency</InputLabel>
+                        <Select
+                            value={currency}
+                            onChange={(e) => setCurrency(e.target.value)}
+                            label="Currency"
+                        >
+                            {constants.currencies.map((cur) => (
+                                <MenuItem key={cur.value} value={cur.value}>{cur.label}</MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
                     <FormControl fullWidth margin="dense">
                         <InputLabel>Period</InputLabel>
                         <Select
