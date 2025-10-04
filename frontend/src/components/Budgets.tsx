@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
     Typography, Paper, Box, Button, Grid, LinearProgress, Dialog, DialogActions,
-    DialogContent, DialogTitle, TextField, Select, MenuItem, FormControl, InputLabel
+    DialogContent, DialogTitle, TextField, Select, MenuItem, FormControl, InputLabel, Tabs, Tab
 } from '@mui/material';
 import { Add } from '@mui/icons-material';
 import constants from '../data/constants.json';
@@ -32,14 +32,14 @@ const getProgressColor = (value: number) => {
     return 'success';
 };
 
-const BudgetRow: React.FC<Budget> = ({ category, budgeted, currency, spent }) => {
+const BudgetRow: React.FC<Budget> = ({ category, budgeted, currency, spent, period }) => {
     const spentPercentage = (spent / budgeted) * 100;
     const remaining = budgeted - spent;
 
     return (
         <Box component={Paper} sx={{ p: 2, mb: 2, borderRadius: '12px', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)', background: 'rgba(255, 255, 255, 0.8)' }}>
             <Box sx={{ display: 'flex', justifyContent: "space-between" }}>
-                <Typography variant="body1">{category}</Typography>
+                <Typography variant="body1">{category} ({period})</Typography>
                 <Box>
                     <Typography variant="caption">{currency} {spent.toFixed(2)} / {currency} {budgeted.toFixed(2)}</Typography>
                 </Box>
@@ -66,6 +66,7 @@ const Budgets = () => {
     const [amount, setAmount] = useState('');
     const [period, setPeriod] = useState('Month');
     const [budgets, setBudgets] = useState<Budget[]>(budgetsData);
+    const [filter, setFilter] = useState('All');
 
     const handleClickOpen = () => {
         setOpen(true);
@@ -92,7 +93,16 @@ const Budgets = () => {
         }
     };
 
-    const totals = budgets.reduce((acc, budget) => {
+    const handleFilterChange = (event: React.SyntheticEvent, newValue: string) => {
+        setFilter(newValue);
+    };
+
+    const filteredBudgets = budgets.filter(budget => {
+        if (filter === 'All') return true;
+        return budget.period === filter;
+    });
+
+    const totals = filteredBudgets.reduce((acc, budget) => {
         acc.budgeted += budget.budgeted;
         acc.spent += budget.spent;
         return acc;
@@ -116,7 +126,15 @@ const Budgets = () => {
                 </Button>
             </Box>
 
-            {budgets.map((budget) => (
+            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+                <Tabs value={filter} onChange={handleFilterChange} aria-label="budget period filter">
+                    <Tab label="All" value="All" />
+                    <Tab label="Monthly" value="Month" />
+                    <Tab label="Yearly" value="Year" />
+                </Tabs>
+            </Box>
+
+            {filteredBudgets.map((budget) => (
                 <BudgetRow key={budget.category} {...budget} />
             ))}
             <Grid container spacing={2} alignItems="center" sx={{ mt: 2, borderTop: '2px solid #ddd', pt: 2 }}>

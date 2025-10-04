@@ -49,7 +49,7 @@ const TransactionsPage = () => {
     const [account, setAccount] = useState('all');
 
     const [accounts, setAccounts] = useState([]);
-    const [refreshAccounts, setRefreshAccounts] = useState(0);
+    const [, setRefreshAccounts] = useState(0);
     const [refreshSummary, setRefreshSummary] = useState(0);
 
     const handleChange = (event: React.SyntheticEvent, newValue: number) => {
