@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Card, CardContent, Box, Typography, TextField, Select, MenuItem, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Chip, Autocomplete, Skeleton } from '@mui/material';
+import { Card, CardContent, Box, Typography, TextField, Select, MenuItem, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Chip, Autocomplete, Skeleton, useTheme, useMediaQuery } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useAuth } from '../contexts/AuthContext';
@@ -31,6 +31,9 @@ interface SymbolSearchItem {
 const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.SetStateAction<Asset[]>>, accounts: Account[], loading: boolean }> = ({ assets = [], setAssets, accounts = [], loading }) => {
   const { token } = useAuth();
   const queryClient = useQueryClient();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isSmallMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [open, setOpen] = React.useState(false);
   const [newAsset, setNewAsset] = React.useState<{
     name: string;
@@ -294,52 +297,149 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
     Array.from(new Array(5)).map((_, index) => (
       <TableRow key={index}>
         <TableCell><Skeleton variant="text" /></TableCell>
+        {!isMobile && <TableCell><Skeleton variant="text" /></TableCell>}
+        {!isMobile && <TableCell><Skeleton variant="text" /></TableCell>}
         <TableCell><Skeleton variant="text" /></TableCell>
         <TableCell><Skeleton variant="text" /></TableCell>
-        <TableCell><Skeleton variant="text" /></TableCell>
-        <TableCell><Skeleton variant="text" /></TableCell>
-        <TableCell><Skeleton variant="text" /></TableCell>
+        {!isMobile && <TableCell><Skeleton variant="text" /></TableCell>}
         <TableCell><Skeleton variant="text" /></TableCell>
       </TableRow>
     ))
   );
 
   return (
-    <Card sx={{ mt: 4 }}>
-      <CardContent>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h6">Your Assets</Typography>
-          <Box sx={{ display: 'flex', gap: 2 }}>
+    <Card sx={{
+      mt: 4,
+      mx: isSmallMobile ? 1 : 0,
+      width: '100%',
+      maxWidth: '100vw',
+      overflow: 'hidden'
+    }}>
+      <CardContent sx={{
+        px: isSmallMobile ? 1 : 2,
+        pt: 2,
+        pb: 3,
+        '&:last-child': { pb: 3 }
+      }}>
+        <Box sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: isMobile ? 'stretch' : 'center',
+          mb: 2,
+          flexDirection: isMobile ? 'column' : 'row',
+          gap: isMobile ? 2 : 0,
+          width: '100%'
+        }}>
+          <Typography
+            variant={isSmallMobile ? "subtitle1" : "h6"}
+            sx={{
+              textAlign: isMobile ? 'center' : 'left',
+              mb: isMobile ? 1 : 0
+            }}
+          >
+            Your Assets
+          </Typography>
+          <Box sx={{
+            display: 'flex',
+            gap: isMobile ? 1 : 2,
+            flexDirection: isMobile ? 'column' : 'row',
+            width: isMobile ? '100%' : 'auto',
+            flexWrap: isSmallMobile ? 'nowrap' : 'wrap'
+          }}>
             <TextField
               label="Search Asset"
               variant="outlined"
-              size="small"
+              size={isSmallMobile ? "small" : "small"}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              fullWidth={isMobile}
+              sx={{ minWidth: isSmallMobile ? 140 : 200 }}
             />
-            <Select defaultValue="all" size="small">
+            <Select
+              defaultValue="all"
+              size="small"
+              fullWidth={isMobile}
+              sx={{ minWidth: isSmallMobile ? 120 : 150 }}
+            >
               <MenuItem value="all">All Types</MenuItem>
               <MenuItem value="stocks">Stocks</MenuItem>
               <MenuItem value="crypto">Cryptocurrency</MenuItem>
               <MenuItem value="real_estate">Real Estate</MenuItem>
               <MenuItem value="cash">Cash</MenuItem>
             </Select>
-            <Button variant="contained" onClick={handleClickOpen}>Add Asset</Button>
+            <Button
+              variant="contained"
+              onClick={handleClickOpen}
+              fullWidth={isMobile}
+              size={isSmallMobile ? "small" : "medium"}
+            >
+              Add Asset
+            </Button>
           </Box>
         </Box>
-        <TableContainer >
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Asset</TableCell>
-                <TableCell>Price/Cost</TableCell>
-                <TableCell>Change</TableCell>
-                <TableCell>Quantity</TableCell>
-                <TableCell>Market Value</TableCell>
-                <TableCell>Type</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
+        <Box sx={{
+          overflowX: 'auto',
+          maxWidth: '100%',
+          WebkitOverflowScrolling: 'touch'
+        }}>
+          <TableContainer sx={{
+            overflow: 'visible',
+            maxWidth: '100%'
+          }}>
+            <Table
+              sx={{
+                minWidth: isSmallMobile ? 300 : isMobile ? 400 : 600,
+                tableLayout: 'fixed'
+              }}
+            >
+              <TableHead>
+                <TableRow>
+                  <TableCell
+                    sx={{
+                      minWidth: isSmallMobile ? 100 : 150,
+                      maxWidth: isSmallMobile ? 120 : 200,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    Asset
+                  </TableCell>
+                  {!isMobile && (
+                    <TableCell sx={{ minWidth: 120 }}>Price/Cost</TableCell>
+                  )}
+                  {!isMobile && (
+                    <TableCell sx={{ minWidth: 80 }}>Change</TableCell>
+                  )}
+                  <TableCell
+                    sx={{
+                      minWidth: isSmallMobile ? 60 : 80,
+                      textAlign: 'center'
+                    }}
+                  >
+                    Quantity
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      minWidth: isSmallMobile ? 80 : 100,
+                      textAlign: 'right'
+                    }}
+                  >
+                    Market Value
+                  </TableCell>
+                  {!isMobile && (
+                    <TableCell sx={{ minWidth: 80 }}>Type</TableCell>
+                  )}
+                  <TableCell
+                    sx={{
+                      minWidth: isSmallMobile ? 80 : 100,
+                      textAlign: 'center'
+                    }}
+                  >
+                    Actions
+                  </TableCell>
+                </TableRow>
+              </TableHead>
             <TableBody>
               {loading ? renderSkeleton() : filteredAssets.map((asset, index) => {
                 const marketValue = Number(asset.market_price) * Number(asset.quantity);
@@ -352,42 +452,121 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
 
                 return (
                   <TableRow key={index}>
-                    <TableCell>{asset.name.split(' - ')[0]}</TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        {/* Apply formatting to market_price */}
-                        <Typography variant="body2" component="span">{formatCurrency(Number(asset.market_price), assetCurrency)}</Typography>
-                        <Typography variant="body2" component="span" color="text.secondary">/</Typography>
-                        <Typography variant="caption" component="span" color="text.secondary">
-                          {/* Apply formatting to average cost */}
-                          {Number(asset.quantity) > 0 ? formatCurrency(avgCost, assetCurrency) : formatCurrency(0, assetCurrency)}
+                    <TableCell
+                      sx={{
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        maxWidth: isSmallMobile ? 120 : 200
+                      }}
+                    >
+                      <Box>
+                        <Typography
+                          variant={isSmallMobile ? "caption" : isMobile ? "body2" : "body1"}
+                          sx={{ fontWeight: 'medium' }}
+                          title={asset.name.split(' - ')[0]}
+                        >
+                          {asset.name.split(' - ')[0]}
                         </Typography>
+                        {isMobile && (
+                          <Box sx={{ mt: 1 }}>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ fontSize: isSmallMobile ? '0.7rem' : '0.75rem' }}
+                            >
+                              {formatCurrency(Number(asset.market_price), assetCurrency)} / {Number(asset.quantity) > 0 ? formatCurrency(avgCost, assetCurrency) : formatCurrency(0, assetCurrency)}
+                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5, flexWrap: 'wrap' }}>
+                              {getTypeChip(asset.asset_type)}
+                              {(() => {
+                                if (change !== null && change !== undefined && !isNaN(change)) {
+                                  const color = change >= 0 ? 'success.main' : 'error.main';
+                                  return (
+                                    <Typography variant="caption" color={color} sx={{ fontSize: isSmallMobile ? '0.65rem' : '0.75rem' }}>
+                                      {change > 0 ? '+' : ''}{Number(change).toFixed(2)}%
+                                    </Typography>
+                                  );
+                                }
+                                return <Typography variant="caption" sx={{ fontSize: isSmallMobile ? '0.65rem' : '0.75rem' }}>-</Typography>;
+                              })()}
+                            </Box>
+                          </Box>
+                        )}
                       </Box>
                     </TableCell>
-                    <TableCell>
-                      {(() => {
-                        if (change !== null && change !== undefined && !isNaN(change)) {
-                          const color = change >= 0 ? 'success.main' : 'error.main';
-                          return (
-                            <Typography variant="body2" color={color}>
-                              {change > 0 ? '+' : ''}{Number(change).toFixed(2)}%
-                            </Typography>
-                          );
-                        }
-                        return <Typography variant="body2">-</Typography>;
-                      })()}
+                    {!isMobile && (
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Typography variant="body2" component="span">{formatCurrency(Number(asset.market_price), assetCurrency)}</Typography>
+                          <Typography variant="body2" component="span" color="text.secondary">/</Typography>
+                          <Typography variant="caption" component="span" color="text.secondary">
+                            {Number(asset.quantity) > 0 ? formatCurrency(avgCost, assetCurrency) : formatCurrency(0, assetCurrency)}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                    )}
+                    {!isMobile && (
+                      <TableCell>
+                        {(() => {
+                          if (change !== null && change !== undefined && !isNaN(change)) {
+                            const color = change >= 0 ? 'success.main' : 'error.main';
+                            return (
+                              <Typography variant="body2" color={color}>
+                                {change > 0 ? '+' : ''}{Number(change).toFixed(2)}%
+                              </Typography>
+                            );
+                          }
+                          return <Typography variant="body2">-</Typography>;
+                        })()}
+                      </TableCell>
+                    )}
+                    <TableCell
+                      sx={{
+                        textAlign: 'center',
+                        fontSize: isSmallMobile ? '0.75rem' : 'inherit'
+                      }}
+                    >
+                      {Number(asset.quantity).toFixed(2)}
                     </TableCell>
-                    <TableCell>{Number(asset.quantity).toFixed(2)}</TableCell>
-                    {/* Apply formatting to marketValue */}
-                    <TableCell>{!isNaN(marketValue) ? formatCurrency(marketValue, assetCurrency) : formatCurrency(0, assetCurrency)}</TableCell>
-                    <TableCell>{getTypeChip(asset.asset_type)}</TableCell>
-                    <TableCell>
-                      <IconButton size="small" aria-label="edit" onClick={() => handleEditClick(asset)}>
-                        <EditIcon />
-                      </IconButton>
-                      <IconButton size="small" aria-label="delete" onClick={() => asset.id && handleDeleteClick(asset.id)}>
-                        <DeleteIcon sx={{ color: 'error.main' }} />
-                      </IconButton>
+                    <TableCell
+                      sx={{
+                        textAlign: 'right',
+                        fontSize: isSmallMobile ? '0.75rem' : 'inherit'
+                      }}
+                    >
+                      <Typography
+                        variant={isSmallMobile ? "caption" : isMobile ? "body2" : "body1"}
+                        sx={{ fontWeight: 'medium' }}
+                      >
+                        {!isNaN(marketValue) ? formatCurrency(marketValue, assetCurrency) : formatCurrency(0, assetCurrency)}
+                      </Typography>
+                    </TableCell>
+                    {!isMobile && <TableCell>{getTypeChip(asset.asset_type)}</TableCell>}
+                    <TableCell
+                      sx={{
+                        textAlign: 'center',
+                        px: isSmallMobile ? 0.5 : 1
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+                        <IconButton
+                          size="small"
+                          aria-label="edit"
+                          onClick={() => handleEditClick(asset)}
+                          sx={{ p: isSmallMobile ? 0.5 : 1 }}
+                        >
+                          <EditIcon sx={{ fontSize: isSmallMobile ? '1rem' : '1.25rem' }} />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          aria-label="delete"
+                          onClick={() => asset.id && handleDeleteClick(asset.id)}
+                          sx={{ p: isSmallMobile ? 0.5 : 1 }}
+                        >
+                          <DeleteIcon sx={{ color: 'error.main', fontSize: isSmallMobile ? '1rem' : '1.25rem' }} />
+                        </IconButton>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 );
@@ -395,7 +574,8 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
             </TableBody>
           </Table>
         </TableContainer>
-        <Dialog open={open} onClose={handleClose}>
+        </Box>
+        <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
           <DialogTitle>Add New Asset</DialogTitle>
           <DialogContent>
             {newAsset.asset_type === 'stocks' || newAsset.asset_type === 'crypto' ? (
@@ -499,7 +679,7 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
             <Button onClick={handleAddAsset}>Add</Button>
           </DialogActions>
         </Dialog>
-        <Dialog open={editAssetOpen} onClose={() => { setEditAssetOpen(false); setErrors({}); }}>
+        <Dialog open={editAssetOpen} onClose={() => { setEditAssetOpen(false); setErrors({}); }} maxWidth="sm" fullWidth>
           <DialogTitle>Edit Asset</DialogTitle>
           <DialogContent>
             <TextField

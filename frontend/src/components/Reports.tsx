@@ -152,12 +152,17 @@ const Reports = () => {
         );
     }
 
+    const settings = {
+        margin: { right: 5 },
+        hideLegend: isMobile ? true : false,
+    };
+
     return (
         <Box sx={{
             px: 0,
             py: 1,
             width: '100%',
-            maxWidth: isMobile ? '100vw' : '100%',
+            maxWidth: isMobile ? '75vw' : '100%',
             margin: '0 auto',
             display: 'flex',
             flexDirection: 'column',
@@ -189,6 +194,7 @@ const Reports = () => {
                         my: 1
                     }}>
                         <PieChart
+                            {...settings}
                             series={[
                                 {
                                     data: chartData,
@@ -200,16 +206,11 @@ const Reports = () => {
                                     endAngle: 270,
                                     cx: '50%',
                                     cy: '50%',
+                                    arcLabel: 'value',
                                     highlightScope: { fade: 'global', highlight: 'item' },
                                     valueFormatter: (value) => formatCurrency(value.value),
                                 },
                             ]}
-                            slotProps={{
-                                legend: {
-                                    direction: 'vertical' as const,
-                                    position: { vertical: 'bottom', horizontal: 'center' },
-                                },
-                            }}
                             sx={{
                                 [`& .${pieArcClasses.faded}`]: {
                                     fill: 'gray',
@@ -219,60 +220,6 @@ const Reports = () => {
                             width={isMobile ? Math.min(window.innerWidth - 40, 320) : 400}
                             height={isMobile ? 280 : 350}
                         />
-                    </Box>
-
-                    <Box sx={{ mt: 1 }}>
-                        <Typography variant="subtitle1" fontWeight="bold" gutterBottom align="center">
-                            Top Categories
-                        </Typography>
-                        <Box sx={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 0.5
-                        }}>
-                            {categoryData.slice(0, isMobile ? 5 : 10).map((item, index) => (
-                                <Box
-                                    key={item.category}
-                                    sx={{
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center',
-                                        p: isMobile ? 0.75 : 1,
-                                        bgcolor: index === 0 ? 'primary.light' : 'background.paper',
-                                        borderRadius: 1,
-                                        border: index === 0 ? 2 : 1,
-                                        borderColor: index === 0 ? 'primary.main' : 'divider',
-                                        boxShadow: index === 0 ? 1 : 0
-                                    }}
-                                >
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        <Typography
-                                            variant="h6"
-                                            color={index === 0 ? 'primary.main' : 'text.secondary'}
-                                            sx={{ fontSize: isMobile ? '0.9rem' : '1rem' }}
-                                        >
-                                            {index + 1}
-                                        </Typography>
-                                        <Typography
-                                            variant={isMobile ? "body2" : "body1"}
-                                            fontWeight={index === 0 ? 'bold' : 'normal'}
-                                        >
-                                            {item.category}
-                                        </Typography>
-                                    </Box>
-                                    <Typography
-                                        variant={isMobile ? "caption" : "body2"}
-                                        fontWeight="bold"
-                                        color={index === 0 ? 'primary.dark' : 'text.primary'}
-                                    >
-                                        {formatCurrency(item.value)}
-                                        <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
-                                            ({item.percentage.toFixed(1)}%)
-                                        </Typography>
-                                    </Typography>
-                                </Box>
-                            ))}
-                        </Box>
                     </Box>
                 </CardContent>
             </Card>
@@ -289,13 +236,13 @@ const Reports = () => {
                         </Typography>
 
                         <Box sx={{
-                        width: '100%',
-                        display: 'flex',
-                        justifyContent: 'center',
-                        mt: 1,
-                        overflow: 'auto',
-                        pb: 0.5
-                      }}>
+                            width: '100%',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            mt: 1,
+                            overflow: 'auto',
+                            pb: 0.5
+                        }}>
                             <BarChart
                                 xAxis={[
                                     {

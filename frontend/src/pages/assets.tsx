@@ -12,6 +12,7 @@ import { Asset } from '../types/asset';
 const Assets: React.FC = () => {
   const { token } = useAuth();
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [loading, setLoading] = useState(true);
   const hasFetched = useRef(false);
 
   // React Query for accounts with caching
@@ -26,8 +27,13 @@ const Assets: React.FC = () => {
 
   useEffect(() => {
     const fetchAssets = async () => {
-        if (!token || hasFetched.current) return;
+        if (!token) {
+            setLoading(false);
+            return;
+        }
+        if (hasFetched.current) return;
         hasFetched.current = true;
+        setLoading(true);
 
         try {
             const data = await getAssets(token);
@@ -48,6 +54,8 @@ const Assets: React.FC = () => {
             setAssets(assetsWithMarketPrice);
         } catch (error) {
             console.error('Failed to fetch assets', error);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -87,7 +95,7 @@ const Assets: React.FC = () => {
             </Grid>
           ))}
         </Grid>
-        <AssetList assets={assets} setAssets={setAssets} accounts={accounts} loading={false} />
+        <AssetList assets={assets} setAssets={setAssets} accounts={accounts} loading={loading} />
       </Box>
     </div>
   );
