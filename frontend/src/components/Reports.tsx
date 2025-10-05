@@ -27,6 +27,16 @@ const Reports = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    // Add touch-friendly scrolling for mobile
+    React.useEffect(() => {
+        if (isMobile) {
+            document.body.style.touchAction = 'pan-y';
+            return () => {
+                document.body.style.touchAction = '';
+            };
+        }
+    }, [isMobile]);
+
     useEffect(() => {
         const fetchCategoryData = async () => {
             if (!token) return;
@@ -143,89 +153,122 @@ const Reports = () => {
     }
 
     return (
-        <Box>
-            <Typography variant="h4" gutterBottom>
-                Transaction Categories Analysis
+        <Box sx={{
+            px: 0,
+            py: 1,
+            width: '100%',
+            maxWidth: isMobile ? '100vw' : '100%',
+            margin: '0 auto',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center'
+        }}>
+            <Typography variant={isMobile ? "h5" : "h4"} component="h1" gutterBottom sx={{ textAlign: 'center', mb: 0.5, width: '100%' }}>
+                Transaction Analysis
             </Typography>
 
-            <Typography variant="subtitle1" color="textSecondary" gutterBottom>
-                Breakdown of expenses by category (showing top 10 categories)
+            <Typography variant="body2" color="textSecondary" align="center" sx={{ mb: 2, width: '100%' }}>
+                Your financial insights at a glance
             </Typography>
 
-            <Card>
-                <CardContent>
-                    <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+            <Card sx={{ mb: 1.5, width: '100%', maxWidth: isMobile ? '95vw' : '100%' }}>
+                <CardContent sx={{ pb: 1 }}>
+                    <Typography variant="h6" gutterBottom align="center">
+                        📊 Expense Categories
+                    </Typography>
+                    <Typography variant="caption" color="textSecondary" display="block" align="center" gutterBottom>
+                        Where your money goes (top 10)
+                    </Typography>
+
+                    <Box sx={{
+                        width: '100%',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        overflow: 'hidden',
+                        my: 1
+                    }}>
                         <PieChart
                             series={[
                                 {
                                     data: chartData,
-                                    innerRadius: isMobile ? 40 : 60,
-                                    outerRadius: isMobile ? 100 : 140,
-                                    paddingAngle: 2,
-                                    cornerRadius: 4,
+                                    innerRadius: isMobile ? 30 : 50,
+                                    outerRadius: isMobile ? 70 : 120,
+                                    paddingAngle: 1,
+                                    cornerRadius: 2,
                                     startAngle: -90,
                                     endAngle: 270,
                                     cx: '50%',
                                     cy: '50%',
-                                    highlightScope: { fade: 'global', highlighted: 'item' },
+                                    highlightScope: { fade: 'global', highlight: 'item' },
                                     valueFormatter: (value) => formatCurrency(value.value),
                                 },
                             ]}
                             slotProps={{
                                 legend: {
-                                    direction: isMobile ? 'row' : 'column',
-                                    position: isMobile ? { vertical: 'bottom', horizontal: 'middle' } : { vertical: 'middle', horizontal: 'right' },
-                                    itemMarkWidth: 15,
-                                    itemMarkHeight: 8,
-                                    markGap: 4,
-                                    itemGap: 8,
-                                    labelStyle: {
-                                        fontSize: isMobile ? 10 : 12,
-                                    },
+                                    direction: 'vertical' as const,
+                                    position: { vertical: 'bottom', horizontal: 'center' },
                                 },
                             }}
                             sx={{
                                 [`& .${pieArcClasses.faded}`]: {
                                     fill: 'gray',
+                                    opacity: 0.3,
                                 },
                             }}
-                            width={isMobile ? 350 : 500}
-                            height={isMobile ? 300 : 400}
+                            width={isMobile ? Math.min(window.innerWidth - 40, 320) : 400}
+                            height={isMobile ? 280 : 350}
                         />
                     </Box>
 
-                    <Box sx={{ mt: 3 }}>
-                        <Typography variant="h6" gutterBottom>
-                            Category Breakdown
+                    <Box sx={{ mt: 1 }}>
+                        <Typography variant="subtitle1" fontWeight="bold" gutterBottom align="center">
+                            Top Categories
                         </Typography>
                         <Box sx={{
-                            display: 'grid',
-                            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(250px, 1fr))',
-                            gap: 2
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 0.5
                         }}>
-                            {categoryData.map((item, index) => (
+                            {categoryData.slice(0, isMobile ? 5 : 10).map((item, index) => (
                                 <Box
                                     key={item.category}
                                     sx={{
                                         display: 'flex',
                                         justifyContent: 'space-between',
                                         alignItems: 'center',
-                                        p: 1,
-                                        bgcolor: 'background.paper',
+                                        p: isMobile ? 0.75 : 1,
+                                        bgcolor: index === 0 ? 'primary.light' : 'background.paper',
                                         borderRadius: 1,
-                                        border: '1px solid',
-                                        borderColor: 'divider'
+                                        border: index === 0 ? 2 : 1,
+                                        borderColor: index === 0 ? 'primary.main' : 'divider',
+                                        boxShadow: index === 0 ? 1 : 0
                                     }}
                                 >
-                                    <Typography variant={isMobile ? "body2" : "body1"}>
-                                        {index + 1}. {item.category}
-                                    </Typography>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Typography
+                                            variant="h6"
+                                            color={index === 0 ? 'primary.main' : 'text.secondary'}
+                                            sx={{ fontSize: isMobile ? '0.9rem' : '1rem' }}
+                                        >
+                                            {index + 1}
+                                        </Typography>
+                                        <Typography
+                                            variant={isMobile ? "body2" : "body1"}
+                                            fontWeight={index === 0 ? 'bold' : 'normal'}
+                                        >
+                                            {item.category}
+                                        </Typography>
+                                    </Box>
                                     <Typography
                                         variant={isMobile ? "caption" : "body2"}
                                         fontWeight="bold"
-                                        sx={{ ml: 1 }}
+                                        color={index === 0 ? 'primary.dark' : 'text.primary'}
                                     >
-                                        {formatCurrency(item.value)} ({item.percentage.toFixed(1)}%)
+                                        {formatCurrency(item.value)}
+                                        <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
+                                            ({item.percentage.toFixed(1)}%)
+                                        </Typography>
                                     </Typography>
                                 </Box>
                             ))}
@@ -236,85 +279,122 @@ const Reports = () => {
 
             {/* Income vs Expense Bar Chart */}
             {monthlyData.length > 0 && (
-                <Card sx={{ mt: 3 }}>
-                    <CardContent>
-                        <Typography variant="h6" gutterBottom>
-                            Income vs Expense Comparison
+                <Card sx={{ mb: 1.5, width: '100%', maxWidth: isMobile ? '95vw' : '100%' }}>
+                    <CardContent sx={{ pb: 1 }}>
+                        <Typography variant="h6" gutterBottom align="center">
+                            💰 Income vs Expenses
                         </Typography>
-                        <Typography variant="subtitle2" color="textSecondary" gutterBottom>
-                            Monthly comparison of income and expenses (last 12 months)
+                        <Typography variant="caption" color="textSecondary" display="block" align="center" gutterBottom>
+                            Monthly comparison (last 12 months)
                         </Typography>
 
-                        <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', mt: 2 }}>
+                        <Box sx={{
+                        width: '100%',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        mt: 1,
+                        overflow: 'auto',
+                        pb: 0.5
+                      }}>
                             <BarChart
                                 xAxis={[
                                     {
-                                        data: monthlyData.map(item => item.month),
+                                        data: monthlyData.slice(0, isMobile ? 6 : 12).map(item => item.month),
                                         scaleType: 'band',
                                         tickLabelStyle: {
-                                            angle: -45,
+                                            angle: isMobile ? -45 : 0,
                                             textAnchor: 'end',
-                                            fontSize: 10,
+                                            fontSize: isMobile ? 9 : 11,
                                         },
                                     }
                                 ]}
                                 series={[
                                     {
-                                        data: monthlyData.map(item => item.income),
+                                        data: monthlyData.slice(0, isMobile ? 6 : 12).map(item => item.income),
                                         label: 'Income',
                                         color: theme.palette.success.main,
+                                        valueFormatter: (value) => formatCurrency(Number(value)),
                                     },
                                     {
-                                        data: monthlyData.map(item => item.expense),
+                                        data: monthlyData.slice(0, isMobile ? 6 : 12).map(item => item.expense),
                                         label: 'Expense',
                                         color: theme.palette.error.main,
+                                        valueFormatter: (value) => formatCurrency(Number(value)),
                                     }
                                 ]}
-                                width={isMobile ? Math.min(window.innerWidth - 100, 600) : 800}
-                                height={isMobile ? 300 : 400}
-                                margin={{ top: 20, right: 30, left: 80, bottom: 100 }}
+                                width={isMobile ? Math.min(window.innerWidth - 40, 350) : Math.min(window.innerWidth - 100, 700)}
+                                height={isMobile ? 250 : 350}
+                                margin={{
+                                    top: 20,
+                                    right: isMobile ? 10 : 30,
+                                    left: isMobile ? 60 : 80,
+                                    bottom: isMobile ? 80 : 60
+                                }}
                                 slotProps={{
                                     legend: {
-                                        direction: 'row' as const,
-                                        position: { vertical: 'top', horizontal: 'center' as const },
-                                        itemGap: 20,
+                                        direction: 'horizontal' as const,
+                                        position: { vertical: 'top', horizontal: 'center' },
                                     },
                                 }}
                             />
                         </Box>
 
                         {/* Summary Statistics */}
-                        <Box sx={{ mt: 3 }}>
-                            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                                Summary Statistics
+                        <Box sx={{ mt: 1.5 }}>
+                            <Typography variant="subtitle1" fontWeight="bold" gutterBottom align="center">
+                                📈 Financial Summary
                             </Typography>
                             <Box sx={{
-                                display: 'grid',
-                                gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
-                                gap: 2,
-                                mt: 2
+                                display: 'flex',
+                                flexDirection: isMobile ? 'column' : 'row',
+                                gap: isMobile ? 1 : 1.5,
+                                mt: 1
                             }}>
-                                <Box sx={{ p: 2, bgcolor: 'success.light', borderRadius: 1, textAlign: 'center' }}>
-                                    <Typography variant="h6" color="success.dark">
-                                        Total Income
+                                <Box sx={{
+                                    p: isMobile ? 1 : 1.5,
+                                    bgcolor: 'success.light',
+                                    borderRadius: 2,
+                                    textAlign: 'center',
+                                    flex: 1,
+                                    border: '2px solid',
+                                    borderColor: 'success.main'
+                                }}>
+                                    <Typography variant={isMobile ? "body2" : "h6"} color="success.dark" gutterBottom>
+                                        💵 Total Income
                                     </Typography>
-                                    <Typography variant="h5" color="success.dark" fontWeight="bold">
+                                    <Typography variant={isMobile ? "h6" : "h5"} color="success.dark" fontWeight="bold">
                                         {formatCurrency(monthlyData.reduce((sum, item) => sum + item.income, 0))}
                                     </Typography>
                                 </Box>
-                                <Box sx={{ p: 2, bgcolor: 'error.light', borderRadius: 1, textAlign: 'center' }}>
-                                    <Typography variant="h6" color="error.dark">
-                                        Total Expenses
+                                <Box sx={{
+                                    p: isMobile ? 1 : 1.5,
+                                    bgcolor: 'error.light',
+                                    borderRadius: 2,
+                                    textAlign: 'center',
+                                    flex: 1,
+                                    border: '2px solid',
+                                    borderColor: 'error.main'
+                                }}>
+                                    <Typography variant={isMobile ? "body2" : "h6"} color="error.dark" gutterBottom>
+                                        💸 Total Expenses
                                     </Typography>
-                                    <Typography variant="h5" color="error.dark" fontWeight="bold">
+                                    <Typography variant={isMobile ? "h6" : "h5"} color="error.dark" fontWeight="bold">
                                         {formatCurrency(monthlyData.reduce((sum, item) => sum + item.expense, 0))}
                                     </Typography>
                                 </Box>
-                                <Box sx={{ p: 2, bgcolor: monthlyData.reduce((sum, item) => sum + item.income, 0) >= monthlyData.reduce((sum, item) => sum + item.expense, 0) ? 'info.light' : 'warning.light', borderRadius: 1, textAlign: 'center' }}>
-                                    <Typography variant="h6" color={monthlyData.reduce((sum, item) => sum + item.income, 0) >= monthlyData.reduce((sum, item) => sum + item.expense, 0) ? 'info.dark' : 'warning.dark'}>
-                                        Net Balance
+                                <Box sx={{
+                                    p: isMobile ? 1 : 1.5,
+                                    bgcolor: monthlyData.reduce((sum, item) => sum + item.income, 0) >= monthlyData.reduce((sum, item) => sum + item.expense, 0) ? 'info.light' : 'warning.light',
+                                    borderRadius: 2,
+                                    textAlign: 'center',
+                                    flex: 1,
+                                    border: '2px solid',
+                                    borderColor: monthlyData.reduce((sum, item) => sum + item.income, 0) >= monthlyData.reduce((sum, item) => sum + item.expense, 0) ? 'info.main' : 'warning.main'
+                                }}>
+                                    <Typography variant={isMobile ? "body2" : "h6"} color={monthlyData.reduce((sum, item) => sum + item.income, 0) >= monthlyData.reduce((sum, item) => sum + item.expense, 0) ? 'info.dark' : 'warning.dark'} gutterBottom>
+                                        {monthlyData.reduce((sum, item) => sum + item.income, 0) >= monthlyData.reduce((sum, item) => sum + item.expense, 0) ? '✅ Net Balance' : '⚠️ Net Balance'}
                                     </Typography>
-                                    <Typography variant="h5" color={monthlyData.reduce((sum, item) => sum + item.income, 0) >= monthlyData.reduce((sum, item) => sum + item.expense, 0) ? 'info.dark' : 'warning.dark'} fontWeight="bold">
+                                    <Typography variant={isMobile ? "h6" : "h5"} color={monthlyData.reduce((sum, item) => sum + item.income, 0) >= monthlyData.reduce((sum, item) => sum + item.expense, 0) ? 'info.dark' : 'warning.dark'} fontWeight="bold">
                                         {formatCurrency(monthlyData.reduce((sum, item) => sum + item.income, 0) - monthlyData.reduce((sum, item) => sum + item.expense, 0))}
                                     </Typography>
                                 </Box>

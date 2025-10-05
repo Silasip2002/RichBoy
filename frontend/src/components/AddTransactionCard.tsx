@@ -31,6 +31,7 @@ import { createTransaction, getAccounts, createAccount } from '../services/api';
 
 interface AddTransactionCardProps {
   onTransactionAdded: () => void;
+  isMobile?: boolean;
 }
 
 interface Account {
@@ -38,7 +39,7 @@ interface Account {
   name: string;
 }
 
-const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAdded }) => {
+const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAdded, isMobile = false }) => {
   const [transactionType, setTransactionType] = useState('expense');
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState(constants.currencies[0].value);
@@ -175,15 +176,15 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
   return (
     <>
       <Card sx={{
-        borderRadius: '16px',
+        borderRadius: isMobile ? '12px' : '16px',
         boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
         backdropFilter: 'blur(4px)',
         WebkitBackdropFilter: 'blur(4px)',
         border: '1px solid rgba(255, 255, 255, 0.18)',
         background: 'rgba(255, 255, 255, 0.9)',
       }}>
-        <CardContent sx={{ p: 3 }}>
-          <Typography variant="h5" sx={{ fontWeight: 700, color: '#333', mb: 3, textAlign: 'center' }}>
+        <CardContent sx={{ p: isMobile ? 2 : 3 }}>
+          <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 700, color: '#333', mb: 3, textAlign: 'center' }}>
             Add New Transaction
           </Typography>
           <div style={{"display":"flex","flexDirection":"column","gap":"1rem"}}>
