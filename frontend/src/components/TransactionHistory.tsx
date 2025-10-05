@@ -162,7 +162,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
         };
 
         fetchSummary();
-    }, [token, refreshSummary]);
+    }, [token, refreshSummary, userProfile, setUserProfile]);
 
     // Refresh summary when user profile currency changes
     useEffect(() => {
@@ -180,7 +180,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
             };
             fetchSummary();
         }
-    }, [userProfile?.preferred_currency, token]);
+    }, [userProfile, token]);
 
     const allCategories = [...constants.transactionCategories.income, ...constants.transactionCategories.expense];
 

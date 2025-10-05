@@ -10,6 +10,16 @@ export interface Asset {
   market_price: number;
 }
 
+export interface AssetData {
+  name: string;
+  symbol: string;
+  asset_type: string;
+  price: string;
+  quantity: string;
+  account: number;
+  cost: string;
+}
+
 export interface Account {
   id: number;
   name: string;

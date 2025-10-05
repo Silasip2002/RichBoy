@@ -7,7 +7,7 @@ import AssetList from '../components/AssetList';
 import { useAuth } from '../contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 
-import { Asset, Account } from '../types/asset';
+import { Asset } from '../types/asset';
 
 const Assets: React.FC = () => {
   const { token } = useAuth();

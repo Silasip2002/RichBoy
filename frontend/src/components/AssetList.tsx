@@ -1,17 +1,17 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import { Card, CardContent, Box, Typography, TextField, Select, MenuItem, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Chip, Autocomplete, Skeleton } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useAuth } from '../contexts/AuthContext';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { updateAsset, deleteAsset, createAsset, getAssetDetails, searchSymbols } from '../services/api';
 
-import { Asset, Account } from '../types/asset';
+import { Asset, AssetData, Account } from '../types/asset';
 
 // Debounce utility function
-function debounce<T extends (...args: any[]) => void>(func: T, wait: number): T {
+function debounce<T extends (...args: unknown[]) => void>(func: T, wait: number): T {
   let timeout: NodeJS.Timeout;
-  return ((...args: any[]) => {
+  return ((...args: unknown[]) => {
     clearTimeout(timeout);
     timeout = setTimeout(() => func(...args), wait);
   }) as T;
@@ -135,9 +135,9 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
 
   // React Query mutations
   const updateAssetMutation = useMutation({
-    mutationFn: (assetData: { id: number; asset: any }) =>
+    mutationFn: (assetData: { id: number; asset: AssetData }) =>
       updateAsset(token!, assetData.id, assetData.asset),
-    onSuccess: (data, variables) => {
+    onSuccess: (data) => {
       const updatedAssets = assets.map((asset) =>
         asset.id === data.id ? { ...data, market_price: editingAsset?.market_price || asset.market_price } : asset
       );
@@ -166,7 +166,7 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
   });
 
   const createAssetMutation = useMutation({
-    mutationFn: (assetData: any) => createAsset(token!, assetData),
+    mutationFn: (assetData: AssetData) => createAsset(token!, assetData),
     onSuccess: (data) => {
       const newAssets = [...assets, { ...data, market_price: data.price }];
       setAssets(newAssets);

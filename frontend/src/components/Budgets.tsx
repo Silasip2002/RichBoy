@@ -180,7 +180,7 @@ const Budgets = ({ refreshSummary = 0 }: BudgetsProps = {}) => {
         };
 
         fetchBudgetSummary();
-    }, [token, refreshSummary, budgets.length]);
+    }, [token, refreshSummary, budgets.length, totals.budgeted, totals.spent, remainingTotal, userProfile, setUserProfile]);
 
     return (
         <Paper sx={{ p: 2, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)' }}>
