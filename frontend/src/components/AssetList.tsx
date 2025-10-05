@@ -123,7 +123,6 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
       const data = await updateAsset(token, editingAsset.id, assetToSend);
       const updatedAssets = assets.map((asset) => (asset.id === data.id ? { ...data, market_price: editingAsset.market_price } : asset));
       setAssets(updatedAssets);
-      localStorage.setItem('assets', JSON.stringify(updatedAssets));
       setEditAssetOpen(false);
       setEditingAsset(null);
     } catch (error) {
@@ -143,7 +142,6 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
       if (response.ok) {
         const updatedAssets = assets.filter((asset) => asset.id !== deletingAssetId);
         setAssets(updatedAssets);
-        localStorage.setItem('assets', JSON.stringify(updatedAssets));
         setDeleteConfirmOpen(false);
         setDeletingAssetId(null);
       } else {
@@ -172,7 +170,6 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
       const data = await createAsset(token, assetToSend);
       const newAssets = [...assets, { ...data, market_price: data.price }];
       setAssets(newAssets);
-      localStorage.setItem('assets', JSON.stringify(newAssets));
       handleClose();
     } catch (error) {
       console.error('Failed to add asset', error);

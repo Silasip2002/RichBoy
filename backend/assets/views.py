@@ -71,7 +71,7 @@ def get_asset_details(request):
 
     try:
         if asset_type == 'crypto':
-            symbol = f'{symbol}-USD'
+            symbol = f'{symbol}'
 
         ticker = yf.Ticker(symbol)
         info = ticker.info
