@@ -27,6 +27,7 @@ import {
 } from '@mui/material';
 import { getTransactionSummary, deleteTransaction, getUserProfile } from '../services/api';
 import DeleteIcon from '@mui/icons-material/Delete';
+import RepeatIcon from '@mui/icons-material/Repeat';
 
 interface Transaction {
     id: number;
@@ -37,6 +38,8 @@ interface Transaction {
     category: string;
     date: string;
     account: string;
+    is_recurring?: boolean;
+    recurring_interval?: string | null;
 }
 
 interface TransactionHistoryProps {
@@ -263,7 +266,16 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
                                         sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
                                     >
                                         <TableCell component="th" scope="row">
-                                            {transaction.date}
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                {transaction.date}
+                                                {transaction.is_recurring && (
+                                                    <RepeatIcon
+                                                        color="primary"
+                                                        fontSize="small"
+                                                        titleAccess={`Recurring: ${transaction.recurring_interval}`}
+                                                    />
+                                                )}
+                                            </Box>
                                         </TableCell>
                                         <TableCell>{transaction.description}</TableCell>
                                         <TableCell>{transaction.category}</TableCell>

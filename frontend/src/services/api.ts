@@ -8,6 +8,7 @@ interface TransactionData {
     category: string;
     date: string;
     is_recurring: boolean;
+    recurring_interval?: string | null;
     account: number;
 }
 
@@ -46,6 +47,7 @@ interface Transaction {
     category: string;
     transaction_type: string;
     is_recurring: boolean;
+    recurring_interval?: string | null;
     account: number;
     currency: string;
 }

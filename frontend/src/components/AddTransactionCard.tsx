@@ -24,6 +24,7 @@ import {
   AttachMoney,
   DescriptionOutlined,
   CalendarTodayOutlined,
+  Repeat,
 } from '@mui/icons-material';
 import constants from '../data/constants.json';
 import { createTransaction, getAccounts, createAccount } from '../services/api';
@@ -45,6 +46,7 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
   const [category, setCategory] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [isRecurring, setIsRecurring] = useState(false);
+  const [recurringInterval, setRecurringInterval] = useState('monthly');
   const [account, setAccount] = useState<number | string>('');
   const [accounts, setAccounts] = useState<Account[]>([]);
   const { token } = useAuth();
@@ -123,6 +125,7 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
         category,
         date,
         is_recurring: isRecurring,
+        recurring_interval: isRecurring ? recurringInterval : null,
         account: accountId,
       });
       console.log('Transaction saved');
@@ -134,6 +137,7 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
       setCategory('');
       setDate(new Date().toISOString().split('T')[0]);
       setIsRecurring(false);
+      setRecurringInterval('monthly');
     } catch (error) {
       console.error('Failed to save transaction:', error);
       alert('Failed to save transaction: ' + (error as Error).message);
@@ -302,7 +306,7 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <CalendarTodayOutlined />
+                    {isRecurring ? <Repeat color="primary" /> : <CalendarTodayOutlined />}
                   </InputAdornment>
                 ),
               }}
@@ -312,6 +316,20 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
               label="Recurring transaction"
               sx={{ width: '100%' }}
             />
+            {isRecurring && (
+              <TextField
+                select
+                label="Recurring Interval"
+                value={recurringInterval}
+                onChange={(e) => setRecurringInterval(e.target.value)}
+                fullWidth
+                helperText="How often should this transaction repeat?"
+              >
+                <MenuItem value="weekly">Weekly</MenuItem>
+                <MenuItem value="monthly">Monthly</MenuItem>
+                <MenuItem value="yearly">Yearly</MenuItem>
+              </TextField>
+            )}
             <Button variant="contained" color="primary" onClick={handleSaveTransaction} fullWidth sx={{ py: 1.5, textTransform: 'none', borderRadius: '8px', fontWeight: 600 }}>
               Add Transaction
             </Button>
