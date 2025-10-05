@@ -5,6 +5,7 @@ import DashboardCard from './DashboardCard';
 import PortfolioPerformanceCard from './PortfolioPerformanceCard';
 import TransactionsPage from '../pages/transactions';
 import Assets from '../pages/assets';
+import Settings from '../pages/settings';
 
 interface ContentAreaProps {
   selectedMenuItem: string;
@@ -30,6 +31,9 @@ const ContentArea: React.FC<ContentAreaProps> = ({ selectedMenuItem }) => {
       break;
     case 'Assets':
       content = <Assets />;
+      break;
+    case 'Settings':
+      content = <Settings />;
       break;
     case 'Reports':
       content = <Typography paragraph>Access various reports and analytics.</Typography>;
