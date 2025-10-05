@@ -6,7 +6,9 @@ from .views import (
     get_portfolio_summary,
     get_asset_allocation,
     get_transaction_summary,
-    get_portfolio_growth
+    get_portfolio_growth,
+    convert_currency_api,
+    get_budget_summary
 )
 
 router = DefaultRouter()
@@ -19,4 +21,6 @@ urlpatterns = [
     path('get_asset_allocation/', get_asset_allocation, name='get_asset_allocation'),
     path('get_transaction_summary/', get_transaction_summary, name='get_transaction_summary'),
     path('get_portfolio_growth/', get_portfolio_growth, name='get_portfolio_growth'),
+    path('convert_currency/', convert_currency_api, name='convert_currency_api'),
+    path('get_budget_summary/', get_budget_summary, name='get_budget_summary'),
 ]

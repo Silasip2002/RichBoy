@@ -145,6 +145,7 @@ const TransactionsPage = () => {
                             setAccount={setAccount}
                             accounts={accounts}
                             refreshSummary={refreshSummary}
+                            onRefresh={handleTransactionAdded}
                         />
                     </Box>
                     <Box sx={{ width: { xs: '100%', md: '320px' }, flexShrink: 0 }}>

@@ -47,3 +47,18 @@ class Transaction(models.Model):
     date = models.DateField()
     is_recurring = models.BooleanField(default=False)
     account = models.ForeignKey('accounts.Account', on_delete=models.CASCADE, related_name='transactions_for_account')
+
+class Budget(models.Model):
+    PERIOD_CHOICES = [
+        ('Month', 'Month'),
+        ('Year', 'Year'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='budgets')
+    category = models.CharField(max_length=20, choices=Transaction.CATEGORY_CHOICES)
+    budgeted_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES)
+    period = models.CharField(max_length=5, choices=PERIOD_CHOICES)
+
+    def __str__(self):
+        return f"{self.user.username}'s {self.get_category_display()} Budget ({self.get_period_display()})"

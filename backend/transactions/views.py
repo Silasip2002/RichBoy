@@ -3,12 +3,23 @@ from rest_framework.response import Response
 from django.db import transaction as db_transaction
 import logging
 
-from .models import Transaction
-from .serializers import TransactionSerializer, CategorySerializer
+from .models import Transaction, Budget
+from .serializers import TransactionSerializer, CategorySerializer, BudgetSerializer
 from accounts.models import Account
 from richboy_backend.pagination import StandardResultsSetPagination
 
 logger = logging.getLogger(__name__)
+
+class BudgetViewSet(viewsets.ModelViewSet):
+    serializer_class = BudgetSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
+
+    def get_queryset(self):
+        return Budget.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
 class CategoryViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]

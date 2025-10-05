@@ -100,6 +100,17 @@ export const createTransaction = async (token: string, transactionData: Transact
     return response.json();
 };
 
+export const deleteTransaction = async (token: string, transactionId: number) => {
+    const response = await fetch(`${API_BASE_URL}/transactions/${transactionId}/`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(token),
+    });
+    if (!response.ok) {
+        throw new Error('Failed to delete transaction');
+    }
+    return response;
+};
+
 export const getAccounts = async (token: string) => {
     const response = await fetch(`${API_BASE_URL}/accounts/`, {
         headers: getAuthHeaders(token),
@@ -387,6 +398,113 @@ export const getPortfolioGrowth = async (token: string, timeframe: string = 'all
     });
     if (!response.ok) {
         throw new Error('Failed to fetch portfolio growth data');
+    }
+    return response.json();
+};
+
+export interface Budget {
+    id: number;
+    category: string;
+    budgeted_amount: number;
+    spent_amount: number;
+    currency: string;
+    period: string;
+}
+
+export interface BudgetData {
+    category: string;
+    budgeted_amount: string;
+    currency: string;
+    period: string;
+}
+
+interface RawBudget {
+    id: number;
+    category: string;
+    budgeted_amount: string;
+    spent_amount: string;
+    currency: string;
+    period: string;
+}
+
+export const getBudgets = async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/budgets/`, {
+        headers: getAuthHeaders(token),
+    });
+    if (!response.ok) {
+        throw new Error('Failed to fetch budgets');
+    }
+    const data = await response.json();
+    return {
+        ...data,
+        results: data.results.map((budget: RawBudget) => ({
+            ...budget,
+            budgeted_amount: parseFloat(budget.budgeted_amount),
+            spent_amount: parseFloat(budget.spent_amount),
+        })),
+    };
+};
+
+export const createBudget = async (token: string, budgetData: BudgetData) => {
+    const response = await fetch(`${API_BASE_URL}/budgets/`, {
+        method: 'POST',
+        headers: getAuthHeaders(token),
+        body: JSON.stringify(budgetData),
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(Object.values(errorData).flat().join(' ') || 'Failed to create budget');
+    }
+    return response.json();
+};
+
+export const updateBudget = async (token: string, budgetId: number, budgetData: Partial<BudgetData>) => {
+    const response = await fetch(`${API_BASE_URL}/budgets/${budgetId}/`, {
+        method: 'PUT',
+        headers: getAuthHeaders(token),
+        body: JSON.stringify(budgetData),
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(Object.values(errorData).flat().join(' ') || 'Failed to update budget');
+    }
+    return response.json();
+};
+
+export const deleteBudget = async (token: string, budgetId: number) => {
+    const response = await fetch(`${API_BASE_URL}/budgets/${budgetId}/`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(token),
+    });
+    if (!response.ok) {
+        throw new Error('Failed to delete budget');
+    }
+    return response;
+};
+
+export const convertCurrency = async (token: string, amount: number, fromCurrency: string, toCurrency: string) => {
+    const response = await fetch(`${API_BASE_URL}/convert_currency/`, {
+        method: 'POST',
+        headers: getAuthHeaders(token),
+        body: JSON.stringify({
+            amount,
+            from_currency: fromCurrency,
+            to_currency: toCurrency,
+        }),
+    });
+    if (!response.ok) {
+        throw new Error('Failed to convert currency');
+    }
+    const data = await response.json();
+    return data.converted_amount;
+};
+
+export const getBudgetSummary = async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/get_budget_summary/`, {
+        headers: getAuthHeaders(token),
+    });
+    if (!response.ok) {
+        throw new Error('Failed to fetch budget summary');
     }
     return response.json();
 };

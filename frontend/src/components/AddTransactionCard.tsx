@@ -45,7 +45,7 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
   const [category, setCategory] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [isRecurring, setIsRecurring] = useState(false);
-  const [account, setAccount] = useState('');
+  const [account, setAccount] = useState<number | string>('');
   const [accounts, setAccounts] = useState<Account[]>([]);
   const { token } = useAuth();
 
@@ -86,6 +86,34 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
 
   const handleSaveTransaction = async () => {
     if (!token) return;
+
+    // Validate required fields
+    if (!account || account === '') {
+      alert('Please select an account');
+      return;
+    }
+
+    if (!amount) {
+      alert('Please enter an amount');
+      return;
+    }
+
+    if (!description) {
+      alert('Please enter a description');
+      return;
+    }
+
+    if (!category) {
+      alert('Please select a category');
+      return;
+    }
+
+    const accountId = typeof account === 'string' ? Number(account) : account;
+    if (isNaN(accountId) || accountId <= 0) {
+      alert('Invalid account selected');
+      return;
+    }
+
     try {
       await createTransaction(token, {
         transaction_type: transactionType,
@@ -95,12 +123,20 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
         category,
         date,
         is_recurring: isRecurring,
-        account: Number(account),
+        account: accountId,
       });
       console.log('Transaction saved');
       onTransactionAdded();
+
+      // Reset form
+      setAmount('');
+      setDescription('');
+      setCategory('');
+      setDate(new Date().toISOString().split('T')[0]);
+      setIsRecurring(false);
     } catch (error) {
       console.error('Failed to save transaction:', error);
+      alert('Failed to save transaction: ' + (error as Error).message);
     }
   };
 
@@ -227,7 +263,7 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
                 select
                 label="Account"
                 value={account}
-                onChange={(e) => setAccount(e.target.value)}
+                onChange={(e) => setAccount(e.target.value === '' ? '' : Number(e.target.value))}
                 fullWidth
               >
                 <MenuItem value="" disabled>Select an account</MenuItem>

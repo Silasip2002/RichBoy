@@ -18,8 +18,15 @@ import {
     InputLabel,
     Select,
     MenuItem,
+    IconButton,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Button,
 } from '@mui/material';
-import { getTransactionSummary } from '../services/api';
+import { getTransactionSummary, deleteTransaction, getUserProfile } from '../services/api';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 interface Transaction {
     id: number;
@@ -51,6 +58,7 @@ interface TransactionHistoryProps {
     setAccount: (account: string) => void;
     accounts: { id: number; name: string }[];
     refreshSummary: number;
+    onRefresh: () => void;
 }
 
 const TransactionHistory: React.FC<TransactionHistoryProps> = ({
@@ -72,11 +80,15 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
     setAccount,
     accounts,
     refreshSummary,
+    onRefresh,
 }) => {
     const [totalIncome, setTotalIncome] = useState(0);
     const [totalExpense, setTotalExpense] = useState(0);
     const [netBalance, setNetBalance] = useState(0);
     const [summaryCurrency, setSummaryCurrency] = useState('USD');
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [transactionToDelete, setTransactionToDelete] = useState<number | null>(null);
+    const [userProfile, setUserProfile] = useState<{ preferred_currency: string } | null>(null);
     const { token } = useAuth();
 
     // Helper function for currency formatting
@@ -89,6 +101,46 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
         }).format(value);
     };
 
+    const handleDeleteClick = (transactionId: number) => {
+        setTransactionToDelete(transactionId);
+        setDeleteDialogOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (transactionToDelete && token) {
+            try {
+                await deleteTransaction(token, transactionToDelete);
+                setDeleteDialogOpen(false);
+                setTransactionToDelete(null);
+                onRefresh();
+            } catch (error) {
+                console.error('Failed to delete transaction:', error);
+                alert('Failed to delete transaction. Please try again.');
+            }
+        }
+    };
+
+    const handleDeleteCancel = () => {
+        setDeleteDialogOpen(false);
+        setTransactionToDelete(null);
+    };
+
+    // Fetch user profile and monitor currency changes
+    useEffect(() => {
+        const fetchUserProfile = async () => {
+            if (token) {
+                try {
+                    const profile = await getUserProfile(token);
+                    setUserProfile(profile);
+                } catch (error) {
+                    console.error('Failed to fetch user profile', error);
+                }
+            }
+        };
+
+        fetchUserProfile();
+    }, [token]);
+
     useEffect(() => {
         const fetchSummary = async () => {
             if (token) {
@@ -98,6 +150,11 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
                     setTotalExpense(summary.total_expense);
                     setNetBalance(summary.net_balance);
                     setSummaryCurrency(summary.preferred_currency);
+
+                    // Update user profile if currency changed
+                    if (userProfile && userProfile.preferred_currency !== summary.preferred_currency) {
+                        setUserProfile({ ...userProfile, preferred_currency: summary.preferred_currency });
+                    }
                 } catch (error) {
                     console.error('Failed to fetch transaction summary', error);
                 }
@@ -106,6 +163,24 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 
         fetchSummary();
     }, [token, refreshSummary]);
+
+    // Refresh summary when user profile currency changes
+    useEffect(() => {
+        if (userProfile && token) {
+            const fetchSummary = async () => {
+                try {
+                    const summary = await getTransactionSummary(token);
+                    setTotalIncome(summary.total_income);
+                    setTotalExpense(summary.total_expense);
+                    setNetBalance(summary.net_balance);
+                    setSummaryCurrency(summary.preferred_currency);
+                } catch (error) {
+                    console.error('Failed to fetch transaction summary after currency change', error);
+                }
+            };
+            fetchSummary();
+        }
+    }, [userProfile?.preferred_currency, token]);
 
     const allCategories = [...constants.transactionCategories.income, ...constants.transactionCategories.expense];
 
@@ -159,18 +234,42 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
                         </Select>
                     </FormControl>
                 </Box>                {/* TODO2 : show the total icome , total expense and net balance */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-around', my: 2 }}>
-                    <Box sx={{ p: 2, borderRadius: 2, bgcolor: '#d4edda', color: '#155724', textAlign: 'center' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-around', my: 2, alignItems: 'flex-start' }}>
+                    <Box sx={{ p: 2, borderRadius: 2, bgcolor: '#d4edda', color: '#155724', textAlign: 'center', minWidth: 140, position: 'relative' }}>
                         <Typography variant="h6">Total Income</Typography>
                         <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{formatCurrency(totalIncome, summaryCurrency)}</Typography>
+                        <Typography variant="caption" sx={{ display: 'block', mt: 0.5, opacity: 0.8 }}>
+                            in {summaryCurrency}
+                        </Typography>
+                        {userProfile && (
+                            <Typography variant="caption" sx={{ display: 'block', mt: 0.5, fontSize: '0.7rem', opacity: 0.6 }}>
+                                📊 Auto-converted
+                            </Typography>
+                        )}
                     </Box>
-                    <Box sx={{ p: 2, borderRadius: 2, bgcolor: '#f8d7da', color: '#721c24', textAlign: 'center' }}>
+                    <Box sx={{ p: 2, borderRadius: 2, bgcolor: '#f8d7da', color: '#721c24', textAlign: 'center', minWidth: 140, position: 'relative' }}>
                         <Typography variant="h6">Total Expense</Typography>
                         <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{formatCurrency(totalExpense, summaryCurrency)}</Typography>
+                        <Typography variant="caption" sx={{ display: 'block', mt: 0.5, opacity: 0.8 }}>
+                            in {summaryCurrency}
+                        </Typography>
+                        {userProfile && (
+                            <Typography variant="caption" sx={{ display: 'block', mt: 0.5, fontSize: '0.7rem', opacity: 0.6 }}>
+                                📊 Auto-converted
+                            </Typography>
+                        )}
                     </Box>
-                    <Box sx={{ p: 2, borderRadius: 2, bgcolor: netBalance >= 0 ? '#d4edda' : '#f8d7da', color: netBalance >= 0 ? '#155724' : '#721c24', textAlign: 'center' }}>
+                    <Box sx={{ p: 2, borderRadius: 2, bgcolor: netBalance >= 0 ? '#d4edda' : '#f8d7da', color: netBalance >= 0 ? '#155724' : '#721c24', textAlign: 'center', minWidth: 140, position: 'relative' }}>
                         <Typography variant="h6">Net Balance</Typography>
                         <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{formatCurrency(netBalance, summaryCurrency)}</Typography>
+                        <Typography variant="caption" sx={{ display: 'block', mt: 0.5, opacity: 0.8 }}>
+                            in {summaryCurrency}
+                        </Typography>
+                        {userProfile && (
+                            <Typography variant="caption" sx={{ display: 'block', mt: 0.5, fontSize: '0.7rem', opacity: 0.6 }}>
+                                📊 Auto-converted
+                            </Typography>
+                        )}
                     </Box>
                 </Box>
                 <TableContainer sx={{ maxHeight: 440, overflowY: 'auto' }}>
@@ -182,6 +281,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
                                 <TableCell>Category</TableCell>
                                 <TableCell>Account</TableCell>
                                 <TableCell align="right">Amount</TableCell>
+                                <TableCell align="center">Actions</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -200,6 +300,16 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
                                         <TableCell>{transaction.category}</TableCell>
                                         <TableCell>{accounts.find(acc => acc.id === parseInt(transaction.account))?.name || transaction.account}</TableCell>
                                         <TableCell align="right">{`${transaction.amount} ${transaction.currency}`}</TableCell>
+                                        <TableCell align="center">
+                                            <IconButton
+                                                size="small"
+                                                color="error"
+                                                onClick={() => handleDeleteClick(transaction.id)}
+                                                aria-label="delete transaction"
+                                            >
+                                                <DeleteIcon fontSize="small" />
+                                            </IconButton>
+                                        </TableCell>
                                     </TableRow>
                                 ))}
                         </TableBody>
@@ -214,6 +324,31 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
                     onPageChange={onPageChange}
                     onRowsPerPageChange={onRowsPerPageChange}
                 />
+
+                {/* Delete Confirmation Dialog */}
+                <Dialog
+                    open={deleteDialogOpen}
+                    onClose={handleDeleteCancel}
+                    aria-labelledby="delete-dialog-title"
+                    aria-describedby="delete-dialog-description"
+                >
+                    <DialogTitle id="delete-dialog-title">
+                        Delete Transaction
+                    </DialogTitle>
+                    <DialogContent>
+                        <Typography>
+                            Are you sure you want to delete this transaction? This action cannot be undone.
+                        </Typography>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={handleDeleteCancel} color="primary">
+                            Cancel
+                        </Button>
+                        <Button onClick={handleDeleteConfirm} color="error" variant="contained">
+                            Delete
+                        </Button>
+                    </DialogActions>
+                </Dialog>
             </CardContent>
         </Card>
     );

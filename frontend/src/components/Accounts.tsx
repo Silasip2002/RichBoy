@@ -301,6 +301,11 @@ const Accounts: React.FC<AccountsProps> = ({ onDataChange }) => {
             await updateUserProfile(token, { preferred_currency: preferredCurrency });
             setInitialPreferredCurrency(preferredCurrency); // Update initial to reflect saved state
             alert('Preferred currency updated successfully!');
+
+            // Trigger data refresh to update all currency-converted values
+            if (onDataChange) {
+                onDataChange();
+            }
         } catch (err: unknown) {
             if (err instanceof Error) {
                 setPreferredCurrencyError(err.message || 'Failed to update preferred currency');

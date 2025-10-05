@@ -1,26 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Typography, Paper, Box, Button, Grid, LinearProgress, Dialog, DialogActions,
     DialogContent, DialogTitle, TextField, Select, MenuItem, FormControl, InputLabel, Tabs, Tab
 } from '@mui/material';
 import { Add } from '@mui/icons-material';
 import constants from '../data/constants.json';
-
-interface Budget {
-    category: string;
-    budgeted: number;
-    currency?: string;
-    spent: number;
-    period?: string;
-}
-
-const budgetsData: Budget[] = [
-    { category: 'Groceries', currency: "USD", budgeted: 500, spent: 250, period: 'Month' },
-    { category: 'Entertainment', currency: "CNY", budgeted: 200, spent: 80, period: 'Month' },
-    { category: 'Shopping', currency: "HKD", budgeted: 300, spent: 250, period: 'Month' },
-    { category: 'Transportation', currency: "CAD", budgeted: 150, spent: 140, period: 'Month' },
-    { category: 'Utilities', currency: "USD", budgeted: 100, spent: 110, period: 'Year' },
-];
+import { getBudgets, createBudget, Budget, BudgetData, getUserProfile, getBudgetSummary } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 const getProgressColor = (value: number) => {
     if (value > 90) {
@@ -32,16 +18,26 @@ const getProgressColor = (value: number) => {
     return 'success';
 };
 
-const BudgetRow: React.FC<Budget> = ({ category, budgeted, currency, spent, period }) => {
-    const spentPercentage = (spent / budgeted) * 100;
-    const remaining = budgeted - spent;
+// Helper function for currency formatting
+const formatCurrency = (value: number, currency: string) => {
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: currency,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(value);
+};
+
+const BudgetRow: React.FC<Budget> = ({ category, budgeted_amount, currency, spent_amount, period }) => {
+    const spentPercentage = budgeted_amount > 0 ? (spent_amount / budgeted_amount) * 100 : 0;
+    const remaining = budgeted_amount - spent_amount;
 
     return (
         <Box component={Paper} sx={{ p: 2, mb: 2, borderRadius: '12px', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)', background: 'rgba(255, 255, 255, 0.8)' }}>
             <Box sx={{ display: 'flex', justifyContent: "space-between" }}>
                 <Typography variant="body1">{category} ({period})</Typography>
                 <Box>
-                    <Typography variant="caption">{currency} {spent.toFixed(2)} / {currency} {budgeted.toFixed(2)}</Typography>
+                    <Typography variant="caption">{currency} {spent_amount.toFixed(2)} / {currency} {budgeted_amount.toFixed(2)}</Typography>
                 </Box>
             </Box>
             <LinearProgress
@@ -60,14 +56,55 @@ const BudgetRow: React.FC<Budget> = ({ category, budgeted, currency, spent, peri
     );
 };
 
-const Budgets = () => {
+interface BudgetsProps {
+    refreshSummary?: number;
+}
+
+const Budgets = ({ refreshSummary = 0 }: BudgetsProps = {}) => {
+    const { token } = useAuth();
     const [open, setOpen] = useState(false);
     const [category, setCategory] = useState('');
     const [amount, setAmount] = useState('');
     const [period, setPeriod] = useState('Month');
     const [currency, setCurrency] = useState('USD');
-    const [budgets, setBudgets] = useState<Budget[]>(budgetsData);
+    const [budgets, setBudgets] = useState<Budget[]>([]);
     const [filter, setFilter] = useState('All');
+    const [userProfile, setUserProfile] = useState<{ preferred_currency: string } | null>(null);
+    const [totalBudgeted, setTotalBudgeted] = useState(0);
+    const [totalSpent, setTotalSpent] = useState(0);
+    const [remainingBalance, setRemainingBalance] = useState(0);
+    const [summaryCurrency, setSummaryCurrency] = useState('USD');
+
+    // Fetch user profile and budget summary
+    useEffect(() => {
+        const fetchUserProfile = async () => {
+            if (token) {
+                try {
+                    const profile = await getUserProfile(token);
+                    setUserProfile(profile);
+                } catch (error) {
+                    console.error('Failed to fetch user profile', error);
+                }
+            }
+        };
+
+        fetchUserProfile();
+    }, [token]);
+
+    const fetchBudgets = useCallback(async () => {
+        if (token) {
+            try {
+                const data = await getBudgets(token);
+                setBudgets(data.results);
+            } catch (error) {
+                console.error('Failed to fetch budgets', error);
+            }
+        }
+    }, [token]);
+
+    useEffect(() => {
+        fetchBudgets();
+    }, [fetchBudgets]);
 
     const handleClickOpen = () => {
         setOpen(true);
@@ -77,21 +114,25 @@ const Budgets = () => {
         setOpen(false);
     };
 
-    const handleAddBudget = () => {
-        if (category && amount) {
-            const newBudget: Budget = {
+    const handleAddBudget = async () => {
+        if (category && amount && token) {
+            const budgetData: BudgetData = {
                 category,
-                budgeted: parseFloat(amount),
-                spent: 0,
+                budgeted_amount: amount,
                 currency,
                 period,
             };
-            setBudgets([...budgets, newBudget]);
-            handleClose();
-            setCategory('');
-            setAmount('');
-            setPeriod('Month');
-            setCurrency('USD');
+            try {
+                await createBudget(token, budgetData);
+                fetchBudgets();
+                handleClose();
+                setCategory('');
+                setAmount('');
+                setPeriod('Month');
+                setCurrency('USD');
+            } catch (error) {
+                console.error('Failed to create budget', error);
+            }
         }
     };
 
@@ -105,12 +146,41 @@ const Budgets = () => {
     });
 
     const totals = filteredBudgets.reduce((acc, budget) => {
-        acc.budgeted += budget.budgeted;
-        acc.spent += budget.spent;
+        acc.budgeted += budget.budgeted_amount;
+        acc.spent += budget.spent_amount;
         return acc;
     }, { budgeted: 0, spent: 0 });
 
     const remainingTotal = totals.budgeted - totals.spent;
+
+    // Fetch budget summary from backend (server-side conversion)
+    useEffect(() => {
+        const fetchBudgetSummary = async () => {
+            if (token) {
+                try {
+                    const summary = await getBudgetSummary(token);
+                    setTotalBudgeted(summary.total_budgeted);
+                    setTotalSpent(summary.total_spent);
+                    setRemainingBalance(summary.remaining_balance);
+                    setSummaryCurrency(summary.preferred_currency);
+
+                    // Update user profile if currency changed
+                    if (userProfile && userProfile.preferred_currency !== summary.preferred_currency) {
+                        setUserProfile({ ...userProfile, preferred_currency: summary.preferred_currency });
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch budget summary', error);
+                    // Fallback to local totals if API fails
+                    setTotalBudgeted(totals.budgeted);
+                    setTotalSpent(totals.spent);
+                    setRemainingBalance(remainingTotal);
+                    setSummaryCurrency(userProfile?.preferred_currency || 'USD');
+                }
+            }
+        };
+
+        fetchBudgetSummary();
+    }, [token, refreshSummary, budgets.length]);
 
     return (
         <Paper sx={{ p: 2, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)' }}>
@@ -137,34 +207,28 @@ const Budgets = () => {
             </Box>
 
             {filteredBudgets.map((budget) => (
-                <BudgetRow key={budget.category} {...budget} />
+                <BudgetRow key={budget.id} {...budget} />
             ))}
             <Grid container spacing={2} alignItems="center" sx={{ mt: 2, borderTop: '2px solid #ddd', pt: 2 }}>
                 <Grid size={4}>
-                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>Total: ${totals.budgeted.toFixed(2)}</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                        Total: {formatCurrency(totalBudgeted, summaryCurrency)}
+                    </Typography>
                 </Grid>
                 <Grid size={4} sx={{ textAlign: 'center' }}>
-                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>Used: ${totals.spent.toFixed(2)}</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                        Used: {formatCurrency(totalSpent, summaryCurrency)}
+                    </Typography>
                 </Grid>
                 <Grid size={4} sx={{ textAlign: 'right' }}>
-                    <Typography variant="h6" sx={{ fontWeight: 'bold', color: remainingTotal > 0 ? 'green' : 'red' }}>
-                        Remain: ${remainingTotal.toFixed(2)}
+                    <Typography variant="h6" sx={{ fontWeight: 'bold', color: remainingBalance > 0 ? 'green' : 'red' }}>
+                        Remain: {formatCurrency(remainingBalance, summaryCurrency)}
                     </Typography>
                 </Grid>
             </Grid>
-            <Dialog
-                open={open}
-                onClose={handleClose}
-                sx={{
-                    '& .MuiDialog-paper': {  // Target the Paper component inside Dialog for fine-tuned centering and width
-                        margin: 'auto',  // Ensures horizontal centering
-                        maxWidth: '50vw',  // Prevents overflow on small screens (optional safety)
-                        width: { xs: '95%', sm: '80%', md: '30%' }  // Responsive widths: narrower on larger screens to avoid "too wide"
-                    }
-                }}
-            >
+            <Dialog open={open} onClose={handleClose}>
                 <DialogTitle>Add a New Budget</DialogTitle>
-                <DialogContent sx={{ minHeight: '250px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <DialogContent sx={{ minHeight: '250px' }}>
                     <FormControl fullWidth margin="dense">
                         <InputLabel>Category</InputLabel>
                         <Select
@@ -173,7 +237,7 @@ const Budgets = () => {
                             label="Category"
                         >
                             {constants.transactionCategories.expense.map((cat) => (
-                                <MenuItem key={cat.value} value={cat.label}>{cat.label}</MenuItem>
+                                <MenuItem key={cat.value} value={cat.value}>{cat.label}</MenuItem>
                             ))}
                         </Select>
                     </FormControl>
@@ -181,8 +245,8 @@ const Budgets = () => {
                         autoFocus
                         margin="dense"
                         label="Budget Amount"
-                        fullWidth
                         type="number"
+                        fullWidth
                         value={amount}
                         onChange={(e) => setAmount(e.target.value)}
                     />

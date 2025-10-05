@@ -5,11 +5,12 @@ from django.utils import timezone
 from datetime import datetime, timedelta
 from decimal import Decimal
 import logging
+from django.core.cache import cache
 
 from .models import Account, BalanceSnapshot
 from .serializers import AccountSerializer, BalanceSnapshotSerializer
 from assets.models import ExchangeRate
-from transactions.models import Transaction
+from transactions.models import Transaction, Budget
 from users.models import UserProfile
 
 logger = logging.getLogger(__name__)
@@ -17,16 +18,39 @@ logger = logging.getLogger(__name__)
 def convert_currency(amount, from_currency, to_currency):
     if from_currency == to_currency:
         return amount
+
+    # Create cache key for this conversion
+    cache_key = f"rate_{from_currency}_{to_currency}"
+
+    # Try to get rate from cache first
+    cached_rate = cache.get(cache_key)
+    if cached_rate:
+        return amount * cached_rate
+
     try:
-        # Try direct conversion
+        # Try direct conversion from DB
         rate_obj = ExchangeRate.objects.get(base_currency=from_currency, target_currency=to_currency)
+        # Cache the rate for 1 hour
+        cache.set(cache_key, rate_obj.rate, 3600)
         return amount * rate_obj.rate
     except ExchangeRate.DoesNotExist:
         try:
-            # Try inverse conversion
+            # Try inverse conversion from DB
             rate_obj = ExchangeRate.objects.get(base_currency=to_currency, target_currency=from_currency)
-            return amount / rate_obj.rate
+            inverse_rate = Decimal(1) / rate_obj.rate
+            # Cache the rate for 1 hour
+            cache.set(cache_key, inverse_rate, 3600)
+            return amount * inverse_rate
         except ExchangeRate.DoesNotExist:
+            # Check if we're already fetching this rate to prevent duplicate API calls
+            fetch_key = f"fetching_{cache_key}"
+            if cache.get(fetch_key):
+                logger.warning(f"Already fetching rate for {from_currency}-{to_currency}, skipping")
+                return None
+
+            # Mark that we're fetching this rate
+            cache.set(fetch_key, True, 60)  # Prevent fetching for 60 seconds
+
             # If not in DB, fetch from yfinance
             try:
                 import yfinance as yf
@@ -37,6 +61,10 @@ def convert_currency(amount, from_currency, to_currency):
                     rate = Decimal(hist['Close'].iloc[-1])
                     # Save for next time
                     ExchangeRate.objects.create(base_currency=from_currency, target_currency=to_currency, rate=rate)
+                    # Cache the rate for 1 hour
+                    cache.set(cache_key, rate, 3600)
+                    # Remove the fetching flag
+                    cache.delete(fetch_key)
                     return amount * rate
                 else:
                     # Try inverse ticker
@@ -46,11 +74,19 @@ def convert_currency(amount, from_currency, to_currency):
                     if not hist.empty:
                         rate = Decimal(1) / Decimal(hist['Close'].iloc[-1])
                         ExchangeRate.objects.create(base_currency=from_currency, target_currency=to_currency, rate=rate)
+                        # Cache the rate for 1 hour
+                        cache.set(cache_key, rate, 3600)
+                        # Remove the fetching flag
+                        cache.delete(fetch_key)
                         return amount * rate
             except Exception as e:
                 logger.error(f"yfinance fetch failed for {from_currency}-{to_currency}: {e}")
+                # Remove the fetching flag on error
+                cache.delete(fetch_key)
 
     logger.warning(f"Failed to get rate for {from_currency} to {to_currency}")
+    # Remove the fetching flag
+    cache.delete(fetch_key)
     return None
 
 class AccountViewSet(viewsets.ModelViewSet):
@@ -205,7 +241,7 @@ def get_portfolio_growth(request):
     preferred_currency = user_profile.preferred_currency
 
     all_accounts = Account.objects.filter(user=user)
-    
+
     # Get all unique dates from all snapshots for the user
     all_snapshot_dates = BalanceSnapshot.objects.filter(user=user).values_list('date', flat=True).distinct().order_by('date')
 
@@ -234,11 +270,11 @@ def get_portfolio_growth(request):
         {'date': date, 'total_balance': balance}
         for date, balance in portfolio_growth_data.items()
     ]
-    
+
     # Filter by timeframe if provided
     timeframe = request.query_params.get('timeframe', 'all')
     now = timezone.now().date()
-    
+
     if timeframe == '1w':
         start_date = now - timedelta(weeks=1)
         response_data = [d for d in response_data if datetime.fromisoformat(d['date']).date() >= start_date]
@@ -248,8 +284,95 @@ def get_portfolio_growth(request):
     elif timeframe == '5y':
         start_date = now - timedelta(days=5*365)
         response_data = [d for d in response_data if datetime.fromisoformat(d['date']).date() >= start_date]
-    
+
     # Sort by date to ensure correct line chart display
     response_data.sort(key=lambda x: x['date'])
 
     return Response(response_data)
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def convert_currency_api(request):
+    try:
+        amount = Decimal(str(request.data.get('amount', 0)))
+        from_currency = request.data.get('from_currency')
+        to_currency = request.data.get('to_currency')
+
+        if not from_currency or not to_currency:
+            return Response(
+                {'error': 'Both from_currency and to_currency are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        converted_amount = convert_currency(amount, from_currency, to_currency)
+
+        if converted_amount is None:
+            return Response(
+                {'error': f'Could not convert currency from {from_currency} to {to_currency}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return Response({
+            'converted_amount': float(converted_amount),
+            'from_currency': from_currency,
+            'to_currency': to_currency
+        })
+    except Exception as e:
+        logger.error(f"Currency conversion error: {e}")
+        return Response(
+            {'error': 'Internal server error during currency conversion'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_budget_summary(request):
+    user = request.user
+    user_profile = UserProfile.objects.get(user=user)
+    preferred_currency = user_profile.preferred_currency
+
+    budgets = Budget.objects.filter(user=user)
+
+    total_budgeted = Decimal('0.0')
+    total_spent = Decimal('0.0')
+
+    for budget in budgets:
+        # Convert budgeted amount
+        if budget.currency != preferred_currency:
+            converted_budgeted = convert_currency(budget.budgeted_amount, budget.currency, preferred_currency)
+            if converted_budgeted is not None:
+                total_budgeted += converted_budgeted
+            else:
+                logger.warning(f"Could not convert budgeted amount for budget {budget.id} from {budget.currency} to {preferred_currency}")
+        else:
+            total_budgeted += budget.budgeted_amount
+
+        # Calculate spent amount for this budget category
+        spent_amount = Decimal('0.0')
+        transactions = Transaction.objects.filter(
+            user=user,
+            category=budget.category,
+            transaction_type='expense'
+        )
+
+        for transaction in transactions:
+            if transaction.currency != preferred_currency:
+                converted_amount = convert_currency(transaction.amount, transaction.currency, preferred_currency)
+                if converted_amount is not None:
+                    spent_amount += converted_amount
+                else:
+                    logger.warning(f"Could not convert transaction amount for transaction {transaction.id} from {transaction.currency} to {preferred_currency}")
+                    spent_amount += transaction.amount  # Fallback to original amount
+            else:
+                spent_amount += transaction.amount
+
+        total_spent += spent_amount
+
+    remaining_balance = total_budgeted - total_spent
+
+    return Response({
+        'total_budgeted': total_budgeted,
+        'total_spent': total_spent,
+        'remaining_balance': remaining_balance,
+        'preferred_currency': preferred_currency,
+    })

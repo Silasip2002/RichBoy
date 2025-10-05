@@ -6,7 +6,6 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import ReceiptIcon from '@mui/icons-material/Receipt';
-import AssessmentIcon from '@mui/icons-material/Assessment';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
@@ -25,7 +24,6 @@ const menuItems = [
   { text: 'Dashboard', icon: <DashboardIcon /> },
   { text: 'Transaction', icon: <ReceiptIcon /> },
   { text: 'Assets', icon: <AccountBalanceWalletIcon /> },
-  { text: 'Reports', icon: <AssessmentIcon /> },
 ];
 
 const SidebarContent: React.FC<SidebarContentProps> = ({ onMenuItemClick, selectedMenuItem }) => {
