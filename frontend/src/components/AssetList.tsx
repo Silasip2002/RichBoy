@@ -1,11 +1,21 @@
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { Card, CardContent, Box, Typography, TextField, Select, MenuItem, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Chip, Autocomplete, Skeleton } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useAuth } from '../contexts/AuthContext';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { updateAsset, deleteAsset, createAsset, getAssetDetails, searchSymbols } from '../services/api';
 
 import { Asset, Account } from '../types/asset';
+
+// Debounce utility function
+function debounce<T extends (...args: any[]) => void>(func: T, wait: number): T {
+  let timeout: NodeJS.Timeout;
+  return ((...args: any[]) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  }) as T;
+}
 
 interface SymbolSearchItem {
   id: number;
@@ -18,8 +28,9 @@ interface SymbolSearchItem {
   name: string;
 }
 
-const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.SetStateAction<Asset[]>>, accounts: Account[], loading: boolean }> = ({ assets, setAssets, accounts, loading }) => {
+const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.SetStateAction<Asset[]>>, accounts: Account[], loading: boolean }> = ({ assets = [], setAssets, accounts = [], loading }) => {
   const { token } = useAuth();
+  const queryClient = useQueryClient();
   const [open, setOpen] = React.useState(false);
   const [newAsset, setNewAsset] = React.useState<{
     name: string;
@@ -39,7 +50,28 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
   const [errors, setErrors] = React.useState<{ [key: string]: string }>({});
   const [symbolOptions, setSymbolOptions] = React.useState<{ label: string; value: string; name: string }[]>([]);
   const [searchTerm, setSearchTerm] = React.useState('');
-  const [filteredAssets, setFilteredAssets] = React.useState(assets);
+  const [filteredAssets, setFilteredAssets] = React.useState<Asset[]>([]);
+
+  // Debounced symbol search
+  const debouncedSymbolSearch = useMemo(
+    () => debounce(async (keywords: string, assetType: string) => {
+      if (keywords.length > 1 && token) {
+        try {
+          const data = await searchSymbols(token, keywords, assetType);
+          setSymbolOptions(data.map((item: SymbolSearchItem) => ({
+            label: `${item.symbol} - ${item.name}`,
+            value: item.symbol,
+            name: item.name
+          })));
+        } catch (error: unknown) {
+          console.error('Failed to search symbols', error);
+        }
+      } else {
+        setSymbolOptions([]);
+      }
+    }, 300),
+    [token]
+  );
 
   // Helper function for currency formatting
   const formatCurrency = (value: number, currency: string) => {
@@ -52,6 +84,7 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
   };
 
   React.useEffect(() => {
+    if (!assets) return;
     setFilteredAssets(
       assets.filter(asset =>
         asset.name.split(' - ')[0].toLowerCase().includes(searchTerm.toLowerCase())
@@ -70,7 +103,10 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
 
   const validate = (asset: Partial<Asset>) => {
     const newErrors: { [key: string]: string } = {};
-    if (!asset.name) newErrors.name = 'Asset name is required';
+    // Only validate name if it's not a stock/crypto asset (those get auto-filled)
+    if ((asset.asset_type === 'real_estate' || asset.asset_type === 'cash') && !asset.name) {
+      newErrors.name = 'Asset name is required';
+    }
     if (asset.price === undefined || asset.price === null || asset.price === 0) {
       newErrors.price = 'Price is required';
     } else if (isNaN(parseFloat(String(asset.price)))) {
@@ -97,8 +133,53 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
     setEditAssetOpen(true);
   };
 
-  const handleUpdateAsset = async () => {
-    if (!editingAsset || !token) return;
+  // React Query mutations
+  const updateAssetMutation = useMutation({
+    mutationFn: (assetData: { id: number; asset: any }) =>
+      updateAsset(token!, assetData.id, assetData.asset),
+    onSuccess: (data, variables) => {
+      const updatedAssets = assets.map((asset) =>
+        asset.id === data.id ? { ...data, market_price: editingAsset?.market_price || asset.market_price } : asset
+      );
+      setAssets(updatedAssets);
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
+      setEditAssetOpen(false);
+      setEditingAsset(null);
+    },
+    onError: (error) => {
+      console.error('Failed to update asset', error);
+    }
+  });
+
+  const deleteAssetMutation = useMutation({
+    mutationFn: (assetId: number) => deleteAsset(token!, assetId),
+    onSuccess: (_, assetId) => {
+      const updatedAssets = assets.filter((asset) => asset.id !== assetId);
+      setAssets(updatedAssets);
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
+      setDeleteConfirmOpen(false);
+      setDeletingAssetId(null);
+    },
+    onError: (error) => {
+      console.error('Failed to delete asset', error);
+    }
+  });
+
+  const createAssetMutation = useMutation({
+    mutationFn: (assetData: any) => createAsset(token!, assetData),
+    onSuccess: (data) => {
+      const newAssets = [...assets, { ...data, market_price: data.price }];
+      setAssets(newAssets);
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
+      handleClose();
+    },
+    onError: (error) => {
+      console.error('Failed to add asset', error);
+    }
+  });
+
+  const handleUpdateAsset = () => {
+    if (!editingAsset) return;
     const newErrors = validate(editingAsset);
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -112,22 +193,13 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
       quantity: quantity.toFixed(4),
       cost: (price * quantity).toFixed(2),
     };
-    try {
 
-      if (!editingAsset || editingAsset.id === undefined) {
-        // Handle the error case (e.g., close edit mode or show a message)
-        setEditingAsset(null);
-        return; // Or throw an error if preferred
-      }
-
-      const data = await updateAsset(token, editingAsset.id, assetToSend);
-      const updatedAssets = assets.map((asset) => (asset.id === data.id ? { ...data, market_price: editingAsset.market_price } : asset));
-      setAssets(updatedAssets);
-      setEditAssetOpen(false);
+    if (editingAsset.id === undefined) {
       setEditingAsset(null);
-    } catch (error) {
-      console.error('Failed to update asset', error);
+      return;
     }
+
+    updateAssetMutation.mutate({ id: editingAsset.id, asset: assetToSend });
   };
 
   const handleDeleteClick = (assetId: number) => {
@@ -135,30 +207,26 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
     setDeleteConfirmOpen(true);
   };
 
-  const handleDeleteAsset = async () => {
-    if (!deletingAssetId || !token) return;
-    try {
-      const response = await deleteAsset(token, deletingAssetId);
-      if (response.ok) {
-        const updatedAssets = assets.filter((asset) => asset.id !== deletingAssetId);
-        setAssets(updatedAssets);
-        setDeleteConfirmOpen(false);
-        setDeletingAssetId(null);
-      } else {
-        console.error('Failed to delete asset');
-      }
-    } catch (error) {
-      console.error('Failed to delete asset', error);
-    }
+  const handleDeleteAsset = () => {
+    if (!deletingAssetId) return;
+    deleteAssetMutation.mutate(deletingAssetId);
   };
 
-  const handleAddAsset = async () => {
+  const handleAddAsset = () => {
     if (!token) return;
+
+    // For stock/crypto, ensure we have symbol before submitting
+    if ((newAsset.asset_type === 'stocks' || newAsset.asset_type === 'crypto') && !newAsset.symbol) {
+      setErrors({ symbol: 'Please select an asset from the search results' });
+      return;
+    }
+
     const newErrors = validate(newAsset);
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
+
     const assetToSend = {
       ...newAsset,
       account: newAsset.account!,
@@ -166,23 +234,17 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
       quantity: newAsset.quantity.toString(),
       cost: (newAsset.price * newAsset.quantity).toString(),
     };
-    try {
-      const data = await createAsset(token, assetToSend);
-      const newAssets = [...assets, { ...data, market_price: data.price }];
-      setAssets(newAssets);
-      handleClose();
-    } catch (error) {
-      console.error('Failed to add asset', error);
-    }
+    createAssetMutation.mutate(assetToSend);
   };
 
+  
   const handleFetchPrice = async (symbol: string, type: 'new' | 'edit', assetType: string) => {
-    if (!symbol || !token) {
+    if (!symbol) {
       setErrors({ ...errors, symbol: 'Symbol is required to fetch price' });
       return;
     }
     try {
-      const data = await getAssetDetails(token, symbol, assetType);
+      const data = await getAssetDetails(token!, symbol, assetType);
       if (data) {
         if (type === 'new') {
           setNewAsset(prev => ({ ...prev, price: data.price, name: data.name || prev.name }));
@@ -192,6 +254,8 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
             return { ...prev, market_price: data.price, name: data.name || prev.name };
           });
         }
+        // Update the cache
+        queryClient.setQueryData(['assetPrice', symbol, assetType], data);
       } else {
         setErrors({ ...errors, symbol: 'Could not fetch price' });
       }
@@ -201,20 +265,8 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
     }
   };
 
-  const handleSymbolSearch = async (keywords: string) => {
-    if (keywords.length > 1 && token) {
-      try {
-        const data = await searchSymbols(token, keywords, newAsset.asset_type);
-        setSymbolOptions(data.map((item: SymbolSearchItem) => ({ label: `${item.symbol} - ${item.name}`, value: item.symbol, name: item.name })));
-      } catch (error: unknown) {
-        console.error('Failed to search symbols', error);
-        if (error instanceof Error) {
-          setErrors({ ...errors, symbol: error.message });
-        }
-      }
-    } else {
-      setSymbolOptions([]);
-    }
+  const handleSymbolSearch = (keywords: string) => {
+    debouncedSymbolSearch(keywords, newAsset.asset_type);
   };
 
   const getTypeChip = (type: string) => {
@@ -350,16 +402,17 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
               <Autocomplete
                 options={symbolOptions}
                 getOptionLabel={(option) => option.label}
-                onInputChange={(event, newInputValue) => {
+                onInputChange={(_, newInputValue) => {
                   handleSymbolSearch(newInputValue);
+                  if (errors.symbol) setErrors({ ...errors, symbol: '' });
                 }}
-                onChange={(event, newValue) => {
+                onChange={(_, newValue) => {
                   if (newValue) {
                     setNewAsset(prev => ({ ...prev, name: newValue.name, symbol: newValue.value }));
                     handleFetchPrice(newValue.value, 'new', newAsset.asset_type);
                   }
                 }}
-                renderInput={(params) => <TextField {...params} label="Asset Name" margin="dense" autoFocus error={!!errors.name} helperText={errors.name} />}
+                renderInput={(params) => <TextField {...params} label="Asset Name" margin="dense" autoFocus error={!!errors.symbol} helperText={errors.symbol || 'Search and select an asset'} />}
               />
             ) : (
               <TextField

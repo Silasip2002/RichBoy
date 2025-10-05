@@ -5,32 +5,30 @@ import AssetCard from '../components/AssetCard';
 import { getAccounts, getAssets, getAssetDetails } from '../services/api';
 import AssetList from '../components/AssetList';
 import { useAuth } from '../contexts/AuthContext';
+import { useQuery } from '@tanstack/react-query';
 
 import { Asset, Account } from '../types/asset';
 
 const Assets: React.FC = () => {
   const { token } = useAuth();
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [loading, setLoading] = useState(true);
   const hasFetched = useRef(false);
 
+  // React Query for accounts with caching
+  const { data: accountsData } = useQuery({
+    queryKey: ['accounts'],
+    queryFn: () => getAccounts(token!),
+    enabled: !!token,
+    staleTime: 300000, // Cache for 5 minutes
+  });
+
+  const accounts = accountsData?.results || [];
+
   useEffect(() => {
-    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-
-    const fetchAccounts = async () => {
-        if (!token) return;
-        try {
-            const data = await getAccounts(token);
-            setAccounts(data.results);
-        } catch (error) {
-            console.error('Failed to fetch accounts', error);
-        }
-    };
-
     const fetchAssets = async () => {
-        if (!token) return;
-        setLoading(true);
+        if (!token || hasFetched.current) return;
+        hasFetched.current = true;
+
         try {
             const data = await getAssets(token);
             const assetsWithMarketPrice = await Promise.all(data.results.map(async (asset: Asset) => {
@@ -48,30 +46,12 @@ const Assets: React.FC = () => {
                 return { ...asset, market_price };
             }));
             setAssets(assetsWithMarketPrice);
-            localStorage.setItem('cachedAssets', JSON.stringify({ assets: assetsWithMarketPrice, timestamp: Date.now() }));
         } catch (error) {
             console.error('Failed to fetch assets', error);
-        } finally {
-            setLoading(false);
         }
     };
 
-    if (token && !hasFetched.current) {
-        const cachedData = localStorage.getItem('cachedAssets');
-        if (cachedData) {
-            const { assets: cachedAssets, timestamp } = JSON.parse(cachedData);
-            if (Date.now() - timestamp < CACHE_DURATION) {
-                setAssets(cachedAssets);
-                setLoading(false);
-            } else {
-                fetchAssets();
-            }
-        } else {
-            fetchAssets();
-        }
-        fetchAccounts();
-        hasFetched.current = true;
-    }
+    fetchAssets();
   }, [token]);
 
   const totalAssetValue = assets.reduce((acc, asset) => acc + (asset.market_price * asset.quantity), 0).toFixed(2);
@@ -107,7 +87,7 @@ const Assets: React.FC = () => {
             </Grid>
           ))}
         </Grid>
-        <AssetList assets={assets} setAssets={setAssets} accounts={accounts} loading={loading} />
+        <AssetList assets={assets} setAssets={setAssets} accounts={accounts} loading={false} />
       </Box>
     </div>
   );

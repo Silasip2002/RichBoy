@@ -190,13 +190,6 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
                 <Typography variant="h5" gutterBottom>
                     Transaction History
                 </Typography>
-                {/* TODO1: search function and filter functions here  
-                    1.serach function by the keywods
-                    2.filter by time : all time/ this month/ last month/ custom ragne
-                    3. filter by the type : all type / income/ expense
-                    4. filter by the categoreis
-                    5.filter by the accounts 
-                */}
                 <Box sx={{ display: 'flex', gap: 2, my: 2, flexWrap: 'wrap' }}>
                     <TextField label="Search" variant="outlined" size="small" sx={{ flexGrow: 1, minWidth: '200px' }} value={search} onChange={(e) => setSearch(e.target.value)} />
                     <FormControl sx={{ minWidth: 120 }} size="small">
@@ -237,39 +230,15 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
                 <Box sx={{ display: 'flex', justifyContent: 'space-around', my: 2, alignItems: 'flex-start' }}>
                     <Box sx={{ p: 2, borderRadius: 2, bgcolor: '#d4edda', color: '#155724', textAlign: 'center', minWidth: 140, position: 'relative' }}>
                         <Typography variant="h6">Total Income</Typography>
-                        <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{formatCurrency(totalIncome, summaryCurrency)}</Typography>
-                        <Typography variant="caption" sx={{ display: 'block', mt: 0.5, opacity: 0.8 }}>
-                            in {summaryCurrency}
-                        </Typography>
-                        {userProfile && (
-                            <Typography variant="caption" sx={{ display: 'block', mt: 0.5, fontSize: '0.7rem', opacity: 0.6 }}>
-                                📊 Auto-converted
-                            </Typography>
-                        )}
+                        <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{summaryCurrency} {formatCurrency(totalIncome, summaryCurrency)}</Typography>
                     </Box>
                     <Box sx={{ p: 2, borderRadius: 2, bgcolor: '#f8d7da', color: '#721c24', textAlign: 'center', minWidth: 140, position: 'relative' }}>
                         <Typography variant="h6">Total Expense</Typography>
-                        <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{formatCurrency(totalExpense, summaryCurrency)}</Typography>
-                        <Typography variant="caption" sx={{ display: 'block', mt: 0.5, opacity: 0.8 }}>
-                            in {summaryCurrency}
-                        </Typography>
-                        {userProfile && (
-                            <Typography variant="caption" sx={{ display: 'block', mt: 0.5, fontSize: '0.7rem', opacity: 0.6 }}>
-                                📊 Auto-converted
-                            </Typography>
-                        )}
+                        <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{summaryCurrency} {formatCurrency(totalExpense, summaryCurrency)}</Typography>
                     </Box>
                     <Box sx={{ p: 2, borderRadius: 2, bgcolor: netBalance >= 0 ? '#d4edda' : '#f8d7da', color: netBalance >= 0 ? '#155724' : '#721c24', textAlign: 'center', minWidth: 140, position: 'relative' }}>
                         <Typography variant="h6">Net Balance</Typography>
-                        <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{formatCurrency(netBalance, summaryCurrency)}</Typography>
-                        <Typography variant="caption" sx={{ display: 'block', mt: 0.5, opacity: 0.8 }}>
-                            in {summaryCurrency}
-                        </Typography>
-                        {userProfile && (
-                            <Typography variant="caption" sx={{ display: 'block', mt: 0.5, fontSize: '0.7rem', opacity: 0.6 }}>
-                                📊 Auto-converted
-                            </Typography>
-                        )}
+                        <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{summaryCurrency} {formatCurrency(netBalance, summaryCurrency)}</Typography>
                     </Box>
                 </Box>
                 <TableContainer sx={{ maxHeight: 440, overflowY: 'auto' }}>
