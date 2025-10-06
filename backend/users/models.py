@@ -9,5 +9,29 @@ class UserProfile(models.Model):
     preferred_currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, default='USD') # Add this line
     profile_picture = models.ImageField(upload_to='profile_pictures/', blank=True, null=True)
 
+    # Additional profile fields
+    display_name = models.CharField(max_length=100, blank=True, null=True)
+    age = models.PositiveIntegerField(blank=True, null=True)
+    gender = models.CharField(
+        max_length=20,
+        choices=[
+            ('Male', 'Male'),
+            ('Female', 'Female'),
+            ('Prefer not to say', 'Prefer not to say'),
+            ('Other', 'Other')
+        ],
+        blank=True,
+        default='Prefer not to say'
+    )
+    risk_preference = models.CharField(
+        max_length=10,
+        choices=[
+            ('low', 'Low'),
+            ('medium', 'Medium'),
+            ('high', 'High')
+        ],
+        default='low'
+    )
+
     def __str__(self):
         return self.user.username

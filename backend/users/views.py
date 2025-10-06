@@ -8,6 +8,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.conf import settings
+from django.contrib.auth import authenticate
 import os
 
 import subprocess # Import subprocess
@@ -67,6 +68,12 @@ class UserProfileView(APIView):
     def get(self, request, *args, **kwargs):
         user = request.user
         profile, created = UserProfile.objects.get_or_create(user=user)
+
+        # If no display_name is set, use the username as default
+        if not profile.display_name:
+            profile.display_name = user.username
+            profile.save()
+
         serializer = UserProfileSerializer(profile, context={'request': request})
         return Response(serializer.data)
 
@@ -158,5 +165,70 @@ class ProfilePictureUploadView(APIView):
         except Exception as e:
             return Response(
                 {'error': f'Failed to delete profile picture: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class ChangePasswordView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        try:
+            user = request.user
+            current_password = request.data.get('current_password')
+            new_password = request.data.get('new_password')
+
+            # Validate input
+            if not current_password or not new_password:
+                return Response(
+                    {'error': 'Current password and new password are required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Verify current password
+            if not user.check_password(current_password):
+                return Response(
+                    {'error': 'Current password is incorrect'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Validate new password strength
+            password_errors = []
+            if len(new_password) < 8:
+                password_errors.append('Password must be at least 8 characters long')
+            if not any(c.isupper() for c in new_password):
+                password_errors.append('Password must contain at least one uppercase letter')
+            if not any(c.islower() for c in new_password):
+                password_errors.append('Password must contain at least one lowercase letter')
+            if not any(c.isdigit() for c in new_password):
+                password_errors.append('Password must contain at least one number')
+            if not any(c in '!@#$%^&*(),.?":{}|<>' for c in new_password):
+                password_errors.append('Password must contain at least one special character')
+
+            if password_errors:
+                return Response(
+                    {'error': '; '.join(password_errors)},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Check if new password is same as current password
+            if user.check_password(new_password):
+                return Response(
+                    {'error': 'New password must be different from current password'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Change password
+            user.set_password(new_password)
+            user.save()
+
+            return Response(
+                {'message': 'Password changed successfully'},
+                status=status.HTTP_200_OK
+            )
+
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to change password: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

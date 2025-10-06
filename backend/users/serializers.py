@@ -19,7 +19,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserProfile
-        fields = ['id', 'user', 'preferred_currency', 'profile_picture', 'profile_picture_url']
+        fields = ['id', 'user', 'preferred_currency', 'profile_picture', 'profile_picture_url', 'display_name', 'age', 'gender', 'risk_preference']
 
     def get_profile_picture_url(self, obj):
         request = self.context.get('request')

@@ -36,7 +36,11 @@ interface BalanceSnapshotData {
 }
 
 interface UserProfileData {
-    preferred_currency: string;
+    preferred_currency?: string;
+    display_name?: string;
+    age?: number;
+    gender?: string;
+    risk_preference?: string;
 }
 
 interface Transaction {
@@ -563,4 +567,31 @@ export const deleteProfilePicture = async (token: string) => {
         throw new Error(errorData.error || 'Failed to delete profile picture');
     }
     return response.json();
+};
+
+export const changePassword = async (token: string, currentPassword: string, newPassword: string) => {
+    console.log('API: changePassword called');
+    console.log('API: token:', token ? 'present' : 'missing');
+
+    const response = await fetch(`${API_BASE_URL}/users/change-password/`, {
+        method: 'POST',
+        headers: getAuthHeaders(token),
+        body: JSON.stringify({
+            current_password: currentPassword,
+            new_password: newPassword
+        }),
+    });
+
+    console.log('API: Response status:', response.status);
+    console.log('API: Response ok:', response.ok);
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        console.error('API: Error response:', errorData);
+        throw new Error(errorData.error || 'Failed to change password');
+    }
+
+    const result = await response.json();
+    console.log('API: Success response:', result);
+    return result;
 };
