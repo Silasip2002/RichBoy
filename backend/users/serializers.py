@@ -15,9 +15,19 @@ class UserSerializerForToken(serializers.ModelSerializer):
 
 class UserProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
+    profile_picture_url = serializers.SerializerMethodField()
+
     class Meta:
         model = UserProfile
-        fields = '__all__'
+        fields = ['id', 'user', 'preferred_currency', 'profile_picture', 'profile_picture_url']
+
+    def get_profile_picture_url(self, obj):
+        request = self.context.get('request')
+        if obj.profile_picture:
+            if request:
+                return request.build_absolute_uri(obj.profile_picture.url)
+            return obj.profile_picture.url
+        return None
 
 class UserSerializerWithToken(UserSerializer):
     token = serializers.SerializerMethodField(read_only=True)

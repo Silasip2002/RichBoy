@@ -7,6 +7,7 @@ from transactions.models import CURRENCY_CHOICES # Import CURRENCY_CHOICES
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     preferred_currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, default='USD') # Add this line
+    profile_picture = models.ImageField(upload_to='profile_pictures/', blank=True, null=True)
 
     def __str__(self):
         return self.user.username
