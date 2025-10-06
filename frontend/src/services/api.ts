@@ -510,3 +510,57 @@ export const getBudgetSummary = async (token: string) => {
     }
     return response.json();
 };
+
+export const uploadProfilePicture = async (token: string, file: File) => {
+    console.log('API: uploadProfilePicture called');
+    console.log('API: file:', file);
+    console.log('API: token:', token ? 'present' : 'missing');
+    console.log('API: API_BASE_URL:', API_BASE_URL);
+
+    const formData = new FormData();
+    formData.append('profile_picture', file);
+    console.log('API: FormData created');
+
+    const url = `${API_BASE_URL}/users/profile-picture/`;
+    console.log('API: Making request to:', url);
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                // Don't set Content-Type header when using FormData, it will be set automatically with boundary
+            },
+            body: formData,
+        });
+
+        console.log('API: Response status:', response.status);
+        console.log('API: Response ok:', response.ok);
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('API: Error response:', errorData);
+            throw new Error(errorData.error || 'Failed to upload profile picture');
+        }
+
+        const result = await response.json();
+        console.log('API: Success response:', result);
+        return result;
+    } catch (error) {
+        console.error('API: Upload error:', error);
+        throw error;
+    }
+};
+
+export const deleteProfilePicture = async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/users/profile-picture/`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(token),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete profile picture');
+    }
+    return response.json();
+};
