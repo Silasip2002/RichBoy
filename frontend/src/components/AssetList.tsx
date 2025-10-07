@@ -8,13 +8,16 @@ import { updateAsset, deleteAsset, createAsset, getAssetDetails, searchSymbols }
 
 import { Asset, AssetData, Account } from '../types/asset';
 
-// Debounce utility function
-function debounce<T extends (...args: unknown[]) => void>(func: T, wait: number): T {
+// Debounce utility function for async functions
+function debounceAsync(
+  func: (keywords: string, assetType: string) => Promise<void>,
+  wait: number
+): (keywords: string, assetType: string) => void {
   let timeout: NodeJS.Timeout;
-  return ((...args: unknown[]) => {
+  return (keywords: string, assetType: string) => {
     clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
-  }) as T;
+    timeout = setTimeout(() => func(keywords, assetType), wait);
+  };
 }
 
 interface SymbolSearchItem {
@@ -57,7 +60,7 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
 
   // Debounced symbol search
   const debouncedSymbolSearch = useMemo(
-    () => debounce(async (keywords: string, assetType: string) => {
+    () => debounceAsync(async (keywords: string, assetType: string) => {
       if (keywords.length > 1 && token) {
         try {
           const data = await searchSymbols(token, keywords, assetType);

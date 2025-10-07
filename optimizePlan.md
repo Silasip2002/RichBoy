@@ -16,7 +16,7 @@ This phase focuses on immediate improvements to code structure and development/d
   - **Solution:** Integrate React Query (`@tanstack/react-query`) and refactor components to use `useQuery` and `useMutation` hooks.
   - **Benefit:** This will drastically simplify data-fetching logic, improve performance through caching, and provide a better user experience by keeping server state fresh.
 
-- [ ] **DevOps: Containerize the Application with Docker**
+- [x] **DevOps: Containerize the Application with Docker**
   - **Problem:** The project lacks a containerization setup, which can lead to inconsistencies between development, testing, and production environments.
   - **Solution:** Create `Dockerfile`s for both the frontend and backend, and a `docker-compose.yml` file to orchestrate the services.
   - **Benefit:** This guarantees a consistent and reproducible environment for all developers and for deployment.

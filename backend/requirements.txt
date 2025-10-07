@@ -9,3 +9,4 @@ requests
 yfinance
 yahoofinancials
 django-extensions
+Pillow

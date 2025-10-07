@@ -43,7 +43,7 @@ interface UserProfileData {
     risk_preference?: string;
 }
 
-interface Transaction {
+export interface Transaction {
     id: number;
     date: string;
     description: string;
