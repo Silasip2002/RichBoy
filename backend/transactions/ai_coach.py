@@ -3,13 +3,91 @@ import os
 import logging
 from typing import Dict, Any, List
 from django.conf import settings
+from django.core.cache import cache
+from decimal import Decimal
 from users.models import UserProfile
 from transactions.models import Transaction, Budget
 from accounts.models import Account, BalanceSnapshot
-from assets.models import Asset
+from assets.models import Asset, ExchangeRate
 from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
+
+
+def convert_currency(amount, from_currency, to_currency):
+    """Convert currency using the same logic as accounts.views"""
+    if from_currency == to_currency:
+        return amount
+
+    # Create cache key for this conversion
+    cache_key = f"rate_{from_currency}_{to_currency}"
+
+    # Try to get rate from cache first
+    cached_rate = cache.get(cache_key)
+    if cached_rate:
+        return amount * cached_rate
+
+    try:
+        # Try direct conversion from DB
+        rate_obj = ExchangeRate.objects.get(base_currency=from_currency, target_currency=to_currency)
+        # Cache the rate for 1 hour
+        cache.set(cache_key, rate_obj.rate, 3600)
+        return amount * rate_obj.rate
+    except ExchangeRate.DoesNotExist:
+        try:
+            # Try inverse conversion from DB
+            rate_obj = ExchangeRate.objects.get(base_currency=to_currency, target_currency=from_currency)
+            inverse_rate = Decimal(1) / rate_obj.rate
+            # Cache the rate for 1 hour
+            cache.set(cache_key, inverse_rate, 3600)
+            return amount * inverse_rate
+        except ExchangeRate.DoesNotExist:
+            # Check if we're already fetching this rate to prevent duplicate API calls
+            fetch_key = f"fetching_{cache_key}"
+            if cache.get(fetch_key):
+                logger.warning(f"Already fetching rate for {from_currency}-{to_currency}, skipping")
+                return None
+
+            # Mark that we're fetching this rate
+            cache.set(fetch_key, True, 60)  # Prevent fetching for 60 seconds
+
+            # If not in DB, fetch from yfinance
+            try:
+                import yfinance as yf
+                ticker_symbol = f"{from_currency}{to_currency}=X"
+                ticker = yf.Ticker(ticker_symbol)
+                hist = ticker.history(period="1d")
+                if not hist.empty:
+                    rate = Decimal(hist['Close'].iloc[-1])
+                    # Save for next time
+                    ExchangeRate.objects.create(base_currency=from_currency, target_currency=to_currency, rate=rate)
+                    # Cache the rate for 1 hour
+                    cache.set(cache_key, rate, 3600)
+                    # Remove the fetching flag
+                    cache.delete(fetch_key)
+                    return amount * rate
+                else:
+                    # Try inverse ticker
+                    ticker_symbol = f"{to_currency}{from_currency}=X"
+                    ticker = yf.Ticker(ticker_symbol)
+                    hist = ticker.history(period="1d")
+                    if not hist.empty:
+                        rate = Decimal(1) / Decimal(hist['Close'].iloc[-1])
+                        ExchangeRate.objects.create(base_currency=from_currency, target_currency=to_currency, rate=rate)
+                        # Cache the rate for 1 hour
+                        cache.set(cache_key, rate, 3600)
+                        # Remove the fetching flag
+                        cache.delete(fetch_key)
+                        return amount * rate
+            except Exception as e:
+                logger.error(f"yfinance fetch failed for {from_currency}-{to_currency}: {e}")
+                # Remove the fetching flag on error
+                cache.delete(fetch_key)
+
+    logger.warning(f"Failed to get rate for {from_currency} to {to_currency}")
+    # Remove the fetching flag
+    cache.delete(fetch_key)
+    return None
 
 
 class AICoachService:
@@ -28,7 +106,15 @@ class AICoachService:
 
             # Get accounts
             accounts = Account.objects.filter(user=user)
-            total_balance = sum(account.balance for account in accounts if account.balance)
+            total_balance = Decimal('0.0')
+
+            # Calculate total balance with currency conversion (same logic as portfolio summary)
+            for account in accounts:
+                converted_balance = convert_currency(account.balance, account.currency, profile.preferred_currency)
+                if converted_balance is not None:
+                    total_balance += converted_balance
+                else:
+                    logger.warning(f"Could not convert account balance for account {account.id}")
 
             # Get recent transactions (last 30 days)
             thirty_days_ago = datetime.now() - timedelta(days=30)
@@ -47,10 +133,19 @@ class AICoachService:
 
             # Get assets
             assets = Asset.objects.filter(user=user)
-            total_asset_value = sum(
-                float(asset.market_price or asset.price) * float(asset.quantity)
-                for asset in assets
-            )
+            total_asset_value = Decimal('0.0')
+
+            # Calculate total asset value with currency conversion
+            for asset in assets:
+                asset_value = Decimal(asset.market_price or asset.price) * Decimal(asset.quantity)
+                # Convert asset value to preferred currency (assuming assets are in the same currency as portfolio)
+                # This is a simplification - you might need to add currency fields to assets if they vary
+                converted_asset_value = convert_currency(asset_value, 'USD', profile.preferred_currency)  # Assuming USD as base
+                if converted_asset_value is not None:
+                    total_asset_value += converted_asset_value
+                else:
+                    total_asset_value += asset_value  # Fallback to original value
+                    logger.warning(f"Could not convert asset value for asset {asset.id}")
 
             # Get budgets
             budgets = Budget.objects.filter(user=user)

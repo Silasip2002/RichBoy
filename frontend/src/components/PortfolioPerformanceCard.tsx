@@ -29,6 +29,52 @@ const PortfolioPerformanceCard: React.FC = () => {
   const [displayedAdvice, setDisplayedAdvice] = useState<string>('');
   const [isTyping, setIsTyping] = useState(false);
 
+  const CACHE_KEY = 'ai_coach_advice_cache';
+  const CACHE_TIMESTAMP_KEY = 'ai_coach_advice_timestamp';
+  const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+  const getCachedAdvice = useCallback((): AICoachData | null => {
+    try {
+      const cachedData = localStorage.getItem(CACHE_KEY);
+      const cachedTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
+
+      if (cachedData && cachedTimestamp) {
+        const timestamp = parseInt(cachedTimestamp, 10);
+        const now = Date.now();
+
+        if (now - timestamp < CACHE_DURATION) {
+          return JSON.parse(cachedData);
+        }
+      }
+    } catch (error) {
+      console.error('Error reading cached advice:', error);
+    }
+    return null;
+  }, []);
+
+  const setCachedAdvice = useCallback((data: AICoachData) => {
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+      localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+    } catch (error) {
+      console.error('Error caching advice:', error);
+    }
+  }, []);
+
+  const isCacheExpired = useCallback((): boolean => {
+    try {
+      const cachedTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
+      if (cachedTimestamp) {
+        const timestamp = parseInt(cachedTimestamp, 10);
+        const now = Date.now();
+        return now - timestamp >= CACHE_DURATION;
+      }
+    } catch (error) {
+      console.error('Error checking cache expiration:', error);
+    }
+    return true;
+  }, []);
+
   const typeAdvice = useCallback((text: string) => {
     setDisplayedAdvice('');
     setIsTyping(true);
@@ -36,31 +82,54 @@ const PortfolioPerformanceCard: React.FC = () => {
 
     const typingInterval = setInterval(() => {
       if (currentIndex < text.length) {
-        setDisplayedAdvice(prev => prev + text[currentIndex]);
+        setDisplayedAdvice(text.slice(0, currentIndex + 1));
         currentIndex++;
       } else {
         clearInterval(typingInterval);
         setIsTyping(false);
       }
     }, 30);
+
+    return () => clearInterval(typingInterval);
   }, []);
 
-  const fetchAICoachAdvice = useCallback(async () => {
+  const fetchAICoachAdvice = useCallback(async (forceRefresh: boolean = false) => {
     if (!token) return;
     setIsLoadingAdvice(true);
     setAdviceError(null);
 
     try {
+      // Check cache first (unless force refresh)
+      if (!forceRefresh) {
+        const cachedAdvice = getCachedAdvice();
+        if (cachedAdvice && !isCacheExpired()) {
+          setAiCoachData(cachedAdvice);
+          typeAdvice(cachedAdvice.advice);
+          setIsLoadingAdvice(false);
+          return;
+        }
+      }
+
+      // Fetch fresh data
       const data = await getAICoachAdvice(token);
       setAiCoachData(data);
+      setCachedAdvice(data);
       typeAdvice(data.advice);
     } catch (error) {
       console.error('Failed to fetch AI coach advice', error);
       setAdviceError('Failed to load AI coach advice. Please try again.');
+
+      // Try to load cached data as fallback
+      const cachedAdvice = getCachedAdvice();
+      if (cachedAdvice) {
+        setAiCoachData(cachedAdvice);
+        typeAdvice(cachedAdvice.advice);
+        setAdviceError('Showing cached advice. Please refresh to get latest insights.');
+      }
     } finally {
       setIsLoadingAdvice(false);
     }
-  }, [token, typeAdvice]);
+  }, [token, typeAdvice, getCachedAdvice, setCachedAdvice, isCacheExpired]);
 
   useEffect(() => {
     const fetchAssetAllocation = async () => {
@@ -112,7 +181,7 @@ const PortfolioPerformanceCard: React.FC = () => {
               <Button
                 size="small"
                 startIcon={<RefreshIcon />}
-                onClick={fetchAICoachAdvice}
+                onClick={() => fetchAICoachAdvice(true)}
                 disabled={isLoadingAdvice}
                 sx={{ textTransform: 'none' }}
               >
