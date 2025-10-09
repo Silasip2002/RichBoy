@@ -113,17 +113,35 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
     if ((asset.asset_type === 'real_estate' || asset.asset_type === 'cash') && !asset.name) {
       newErrors.name = 'Asset name is required';
     }
+
+    // Price validation with decimal places check
     if (asset.price === undefined || asset.price === null || asset.price === 0) {
       newErrors.price = 'Price is required';
     } else if (isNaN(parseFloat(String(asset.price)))) {
       newErrors.price = 'Price must be a number';
+    } else {
+      // Check decimal places for price (max 6 decimal places)
+      const priceStr = String(asset.price);
+      const decimalIndex = priceStr.indexOf('.');
+      if (decimalIndex !== -1 && priceStr.length - decimalIndex - 1 > 6) {
+        newErrors.price = 'Price cannot have more than 6 decimal places';
+      }
     }
 
+    // Quantity validation with decimal places check
     if (asset.quantity === undefined || asset.quantity === null || asset.quantity === 0) {
       newErrors.quantity = 'Quantity is required';
     } else if (isNaN(parseFloat(String(asset.quantity)))) {
       newErrors.quantity = 'Quantity must be a number';
+    } else {
+      // Check decimal places for quantity (max 4 decimal places)
+      const quantityStr = String(asset.quantity);
+      const decimalIndex = quantityStr.indexOf('.');
+      if (decimalIndex !== -1 && quantityStr.length - decimalIndex - 1 > 4) {
+        newErrors.quantity = 'Quantity cannot have more than 4 decimal places';
+      }
     }
+
     if (!asset.account) newErrors.account = 'Account is required';
     return newErrors;
   };
@@ -657,24 +675,34 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
               label="Price Per Unit"
               type="text"
               fullWidth
+              value={newAsset.price}
               onChange={(e) => {
-                setNewAsset({ ...newAsset, price: parseFloat(e.target.value) || 0 });
-                if (errors.price) setErrors({ ...errors, price: '' });
+                const value = e.target.value;
+                // Allow empty string, numbers with optional decimal point
+                if (value === '' || /^\d*\.?\d{0,6}$/.test(value)) {
+                  setNewAsset({ ...newAsset, price: parseFloat(value) || 0 });
+                  if (errors.price) setErrors({ ...errors, price: '' });
+                }
               }}
               error={!!errors.price}
-              helperText={errors.price}
+              helperText={errors.price || "Maximum 6 decimal places"}
             />
             <TextField
               margin="dense"
               label="Quantity/Shares"
               type="text"
               fullWidth
+              value={newAsset.quantity}
               onChange={(e) => {
-                setNewAsset({ ...newAsset, quantity: parseFloat(e.target.value) || 0 });
-                if (errors.quantity) setErrors({ ...errors, quantity: '' });
+                const value = e.target.value;
+                // Allow empty string, numbers with optional decimal point
+                if (value === '' || /^\d*\.?\d{0,4}$/.test(value)) {
+                  setNewAsset({ ...newAsset, quantity: parseFloat(value) || 0 });
+                  if (errors.quantity) setErrors({ ...errors, quantity: '' });
+                }
               }}
               error={!!errors.quantity}
-              helperText={errors.quantity}
+              helperText={errors.quantity || "Maximum 4 decimal places"}
             />
           </DialogContent>
           <DialogActions>
@@ -778,16 +806,17 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
               fullWidth
               value={editingAsset?.price || ''}
               onChange={(e) => {
-                if (editingAsset) {
+                const value = e.target.value;
+                if (editingAsset && (value === '' || /^\d*\.?\d{0,6}$/.test(value))) {
                   setEditingAsset({
                     ...editingAsset,
-                    price: parseFloat(e.target.value) || 0
+                    price: parseFloat(value) || 0
                   } as Asset);
                 }
                 if (errors.price) setErrors({ ...errors, price: '' });
               }}
               error={!!errors.price}
-              helperText={errors.price}
+              helperText={errors.price || "Maximum 6 decimal places"}
             />
             <TextField
               margin="dense"
@@ -796,16 +825,17 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
               fullWidth
               value={editingAsset?.quantity || ''}
               onChange={(e) => {
-                if (editingAsset) {
+                const value = e.target.value;
+                if (editingAsset && (value === '' || /^\d*\.?\d{0,4}$/.test(value))) {
                   setEditingAsset({
                     ...editingAsset,
-                    quantity: parseFloat(e.target.value) || 0
+                    quantity: parseFloat(value) || 0
                   } as Asset);
                 }
                 if (errors.quantity) setErrors({ ...errors, quantity: '' });
               }}
               error={!!errors.quantity}
-              helperText={errors.quantity}
+              helperText={errors.quantity || "Maximum 4 decimal places"}
             />
           </DialogContent>
           <DialogActions>
