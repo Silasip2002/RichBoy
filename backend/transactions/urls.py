@@ -3,7 +3,8 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     TransactionViewSet,
     CategoryViewSet,
-    BudgetViewSet
+    BudgetViewSet,
+    get_ai_coach_advice
 )
 
 router = DefaultRouter()
@@ -13,4 +14,5 @@ router.register(r'budgets', BudgetViewSet, basename='budget')
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('ai-coach-advice/', get_ai_coach_advice, name='ai-coach-advice'),
 ]

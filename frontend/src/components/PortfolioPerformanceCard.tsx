@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, Typography, Box, Divider } from '@mui/material';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent, Typography, Box, Divider, Button, CircularProgress, Alert } from '@mui/material';
 import { PieChart } from '@mui/x-charts';
+import { Refresh as RefreshIcon } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
-import { getAssetAllocation } from '../services/api';
+import { getAssetAllocation, getAICoachAdvice } from '../services/api';
 
 interface AssetAllocationData {
   id: number;
@@ -10,9 +11,56 @@ interface AssetAllocationData {
   label: string;
 }
 
+interface AICoachData {
+  advice: string;
+  financial_summary: {
+    total_balance: number;
+    total_spent_last_30_days: number;
+    total_asset_value: number;
+  };
+}
+
 const PortfolioPerformanceCard: React.FC = () => {
   const { token } = useAuth();
   const [assetAllocation, setAssetAllocation] = useState<AssetAllocationData[]>([]);
+  const [aiCoachData, setAiCoachData] = useState<AICoachData | null>(null);
+  const [isLoadingAdvice, setIsLoadingAdvice] = useState(false);
+  const [adviceError, setAdviceError] = useState<string | null>(null);
+  const [displayedAdvice, setDisplayedAdvice] = useState<string>('');
+  const [isTyping, setIsTyping] = useState(false);
+
+  const typeAdvice = useCallback((text: string) => {
+    setDisplayedAdvice('');
+    setIsTyping(true);
+    let currentIndex = 0;
+
+    const typingInterval = setInterval(() => {
+      if (currentIndex < text.length) {
+        setDisplayedAdvice(prev => prev + text[currentIndex]);
+        currentIndex++;
+      } else {
+        clearInterval(typingInterval);
+        setIsTyping(false);
+      }
+    }, 30);
+  }, []);
+
+  const fetchAICoachAdvice = useCallback(async () => {
+    if (!token) return;
+    setIsLoadingAdvice(true);
+    setAdviceError(null);
+
+    try {
+      const data = await getAICoachAdvice(token);
+      setAiCoachData(data);
+      typeAdvice(data.advice);
+    } catch (error) {
+      console.error('Failed to fetch AI coach advice', error);
+      setAdviceError('Failed to load AI coach advice. Please try again.');
+    } finally {
+      setIsLoadingAdvice(false);
+    }
+  }, [token, typeAdvice]);
 
   useEffect(() => {
     const fetchAssetAllocation = async () => {
@@ -31,7 +79,9 @@ const PortfolioPerformanceCard: React.FC = () => {
     };
 
     fetchAssetAllocation();
-  }, [token]);
+    fetchAICoachAdvice();
+    injectStyles();
+  }, [token, fetchAICoachAdvice]);
 
 
 
@@ -55,12 +105,68 @@ const PortfolioPerformanceCard: React.FC = () => {
           }}
         >
           <Box sx={{ width: { xs: '100%', md: '70%' }, minWidth: 0 }}>
-            <Typography variant="h6" component="div" sx={{ mb: 1 }}>
-              Performance
-            </Typography>
-            <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {/* TOOD: AI coath suggestion */}
-              AI Coach Suggestion!!
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography variant="h6" component="div">
+                AI Coach Insights
+              </Typography>
+              <Button
+                size="small"
+                startIcon={<RefreshIcon />}
+                onClick={fetchAICoachAdvice}
+                disabled={isLoadingAdvice}
+                sx={{ textTransform: 'none' }}
+              >
+                {isLoadingAdvice ? 'Loading...' : 'Refresh'}
+              </Button>
+            </Box>
+            <Box sx={{ height: 200, overflowY: 'auto' }}>
+              {isLoadingAdvice ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                  <CircularProgress size={24} />
+                </Box>
+              ) : adviceError ? (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {adviceError}
+                </Alert>
+              ) : aiCoachData ? (
+                <Box>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      lineHeight: 1.6,
+                      whiteSpace: 'pre-line',
+                      fontSize: '0.875rem',
+                      position: 'relative'
+                    }}
+                  >
+                    {displayedAdvice}
+                    {isTyping && <span className="typing-cursor">|</span>}
+                  </Typography>
+
+                  {aiCoachData.financial_summary && (
+                    <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #e0e0e0' }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Financial Snapshot (Last 30 days):
+                      </Typography>
+                      <Box sx={{ mt: 1 }}>
+                        <Typography variant="caption" display="block">
+                          • Total Balance: ${aiCoachData.financial_summary.total_balance.toLocaleString()}
+                        </Typography>
+                        <Typography variant="caption" display="block">
+                          • Total Spent: ${aiCoachData.financial_summary.total_spent_last_30_days.toLocaleString()}
+                        </Typography>
+                        <Typography variant="caption" display="block">
+                          • Investment Value: ${aiCoachData.financial_summary.total_asset_value.toLocaleString()}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  )}
+                </Box>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  No AI coach advice available at the moment.
+                </Typography>
+              )}
             </Box>
           </Box>
           <Box sx={{ width: { xs: '100%', md: '30%' }, minWidth: 0 }}>
@@ -87,6 +193,29 @@ const PortfolioPerformanceCard: React.FC = () => {
       </CardContent>
     </Card>
   );
+};
+
+const TypingCursorStyles = `
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+  }
+
+  .typing-cursor {
+    animation: blink 1s infinite;
+    color: #1976d2;
+    font-weight: bold;
+  }
+`;
+
+const injectStyles = () => {
+  if (typeof document === 'undefined') return;
+  if (document.getElementById('typing-cursor-styles')) return;
+
+  const styleSheet = document.createElement('style');
+  styleSheet.id = 'typing-cursor-styles';
+  styleSheet.textContent = TypingCursorStyles;
+  document.head.appendChild(styleSheet);
 };
 
 export default PortfolioPerformanceCard;

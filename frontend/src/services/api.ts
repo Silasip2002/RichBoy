@@ -595,3 +595,22 @@ export const changePassword = async (token: string, currentPassword: string, new
     console.log('API: Success response:', result);
     return result;
 };
+
+export const getAICoachAdvice = async (token: string) => {
+    console.log('API: Fetching AI coach advice...');
+    const response = await fetch(`${API_BASE_URL}/ai-coach-advice/`, {
+        headers: getAuthHeaders(token),
+    });
+
+    console.log('API: Response status:', response.status);
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        console.error('API: Error response:', errorData);
+        throw new Error(errorData.error || `Failed to get AI coach advice (${response.status})`);
+    }
+
+    const result = await response.json();
+    console.log('API: Success response:', result);
+    return result;
+};

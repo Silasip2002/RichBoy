@@ -1,10 +1,12 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes
 from django.db import transaction as db_transaction
 import logging
 
 from .models import Transaction, Budget
 from .serializers import TransactionSerializer, CategorySerializer, BudgetSerializer
+from .ai_coach import AICoachService
 from accounts.models import Account
 from richboy_backend.pagination import StandardResultsSetPagination
 
@@ -105,3 +107,43 @@ class TransactionViewSet(viewsets.ModelViewSet):
         elif transaction.transaction_type == 'expense':
             account.balance += transaction.amount
         account.save()
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_ai_coach_advice(request):
+    """
+    Get personalized financial advice from AI coach
+    """
+    try:
+        ai_coach = AICoachService()
+
+        # Get user's financial data
+        financial_data = ai_coach.get_user_financial_data(request.user)
+
+        # Generate AI advice
+        advice = ai_coach.generate_financial_advice(financial_data)
+
+        return Response({
+            'advice': advice,
+            'financial_summary': {
+                'total_balance': financial_data.get('accounts', {}).get('total_balance', 0),
+                'total_spent_last_30_days': financial_data.get('recent_spending', {}).get('total_spent', 0),
+                'total_asset_value': financial_data.get('assets', {}).get('total_value', 0),
+            }
+        })
+
+    except ValueError as e:
+        # Handle missing API key
+        logger.error(f"AI Coach configuration error: {e}")
+        return Response({
+            'error': 'AI Coach service is not properly configured',
+            'advice': 'AI Coach is currently unavailable. Please contact support.',
+        }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    except Exception as e:
+        logger.error(f"Error generating AI coach advice: {e}")
+        return Response({
+            'error': 'Failed to generate financial advice',
+            'advice': 'I\'m having trouble providing financial advice right now. Please try again later.',
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

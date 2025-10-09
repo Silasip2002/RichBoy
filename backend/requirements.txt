@@ -10,3 +10,5 @@ yfinance
 yahoofinancials
 django-extensions
 Pillow
+google-generativeai
+python-dotenv
