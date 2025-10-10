@@ -42,15 +42,15 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
     name: string;
     symbol: string;
     asset_type: string;
-    price: number;
-    quantity: number;
+    price: string;
+    quantity: string;
     account?: number;
     cost: number;
-  }>({ name: '', symbol: '', asset_type: 'stocks', price: 0, quantity: 0, cost: 0 });
+  }>({ name: '', symbol: '', asset_type: 'stocks', price: '', quantity: '', cost: 0 });
 
 
   const [editAssetOpen, setEditAssetOpen] = React.useState(false);
-  const [editingAsset, setEditingAsset] = React.useState<Asset | null>(null);
+  const [editingAsset, setEditingAsset] = React.useState<any | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false);
   const [deletingAssetId, setDeletingAssetId] = React.useState<number | null>(null);
   const [errors, setErrors] = React.useState<{ [key: string]: string }>({});
@@ -115,7 +115,7 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
     }
 
     // Price validation with decimal places check
-    if (asset.price === undefined || asset.price === null || asset.price === 0) {
+    if (asset.price === undefined || asset.price === null || asset.price === 0 || asset.price === '') {
       newErrors.price = 'Price is required';
     } else if (isNaN(parseFloat(String(asset.price)))) {
       newErrors.price = 'Price must be a number';
@@ -129,7 +129,7 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
     }
 
     // Quantity validation with decimal places check
-    if (asset.quantity === undefined || asset.quantity === null || asset.quantity === 0) {
+    if (asset.quantity === undefined || asset.quantity === null || asset.quantity === 0 || asset.quantity === '') {
       newErrors.quantity = 'Quantity is required';
     } else if (isNaN(parseFloat(String(asset.quantity)))) {
       newErrors.quantity = 'Quantity must be a number';
@@ -151,8 +151,8 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
     const cost = parseFloat(String(asset.cost));
     setEditingAsset({
       ...asset,
-      price: quantity > 0 ? (cost / quantity) : 0,
-      quantity: quantity
+      price: String(quantity > 0 ? (cost / quantity) : 0),
+      quantity: String(quantity)
     });
     setEditAssetOpen(true);
   };
@@ -213,9 +213,9 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
     const quantity = parseFloat(String(editingAsset.quantity));
     const assetToSend = {
       ...editingAsset,
-      price: price.toFixed(2),
+      price: price.toFixed(6),
       quantity: quantity.toFixed(4),
-      cost: (price * quantity).toFixed(2),
+      cost: (price * quantity).toFixed(6),
     };
 
     if (editingAsset.id === undefined) {
@@ -245,18 +245,21 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
       return;
     }
 
-    const newErrors = validate(newAsset);
+    const newErrors = validate(newAsset as any);
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
 
+    const price = parseFloat(newAsset.price);
+    const quantity = parseFloat(newAsset.quantity);
+
     const assetToSend = {
       ...newAsset,
       account: newAsset.account!,
-      price: newAsset.price.toString(),
-      quantity: newAsset.quantity.toString(),
-      cost: (newAsset.price * newAsset.quantity).toString(),
+      price: price.toFixed(6),
+      quantity: quantity.toFixed(4),
+      cost: (price * quantity).toFixed(6),
     };
     createAssetMutation.mutate(assetToSend);
   };
@@ -680,7 +683,7 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
                 const value = e.target.value;
                 // Allow empty string, numbers with optional decimal point
                 if (value === '' || /^\d*\.?\d{0,6}$/.test(value)) {
-                  setNewAsset({ ...newAsset, price: parseFloat(value) || 0 });
+                  setNewAsset({ ...newAsset, price: value });
                   if (errors.price) setErrors({ ...errors, price: '' });
                 }
               }}
@@ -697,7 +700,7 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
                 const value = e.target.value;
                 // Allow empty string, numbers with optional decimal point
                 if (value === '' || /^\d*\.?\d{0,4}$/.test(value)) {
-                  setNewAsset({ ...newAsset, quantity: parseFloat(value) || 0 });
+                  setNewAsset({ ...newAsset, quantity: value });
                   if (errors.quantity) setErrors({ ...errors, quantity: '' });
                 }
               }}
@@ -810,8 +813,8 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
                 if (editingAsset && (value === '' || /^\d*\.?\d{0,6}$/.test(value))) {
                   setEditingAsset({
                     ...editingAsset,
-                    price: parseFloat(value) || 0
-                  } as Asset);
+                    price: value
+                  });
                 }
                 if (errors.price) setErrors({ ...errors, price: '' });
               }}
@@ -829,8 +832,8 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
                 if (editingAsset && (value === '' || /^\d*\.?\d{0,4}$/.test(value))) {
                   setEditingAsset({
                     ...editingAsset,
-                    quantity: parseFloat(value) || 0
-                  } as Asset);
+                    quantity: value
+                  });
                 }
                 if (errors.quantity) setErrors({ ...errors, quantity: '' });
               }}
