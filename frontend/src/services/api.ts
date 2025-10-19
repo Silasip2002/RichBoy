@@ -655,3 +655,92 @@ export const sendAIGoalChatMessage = async (
     console.log('API: Success response:', result);
     return result;
 };
+
+export interface Goal {
+    id: string;
+    title: string;
+    description: string;
+    target_amount: number;
+    current_amount: number;
+    deadline?: string;
+    category: 'savings' | 'debt_repayment' | 'investment';
+    status: 'active' | 'completed' | 'paused';
+    milestones: Milestone[];
+    created_at: string;
+    updated_at: string;
+    ai_generated?: boolean;
+}
+
+export interface Milestone {
+    id: string;
+    title: string;
+    description: string;
+    target_date: string;
+    completed: boolean;
+    status: 'completed' | 'in_progress' | 'upcoming';
+}
+
+export interface AICreateGoalResponse {
+    success: boolean;
+    goal?: Goal;
+    message?: string;
+    error?: string;
+}
+
+export const createAIGoal = async (
+    token: string,
+    conversationHistory: ChatMessage[]
+): Promise<AICreateGoalResponse> => {
+    console.log('API: Creating AI goal from conversation...');
+    console.log('API: Conversation history length:', conversationHistory.length);
+
+    const response = await fetch(`${API_BASE_URL}/ai-create-goal/`, {
+        method: 'POST',
+        headers: getAuthHeaders(token),
+        body: JSON.stringify({
+            conversation_history: conversationHistory,
+        }),
+    });
+
+    console.log('API: Response status:', response.status);
+    console.log('API: Response headers:', response.headers);
+
+    // Always try to get the response body for debugging
+    let responseData;
+    try {
+        responseData = await response.json();
+        console.log('API: Response data:', responseData);
+    } catch (e) {
+        console.error('API: Failed to parse JSON response:', e);
+        const textResponse = await response.text();
+        console.log('API: Raw response text:', textResponse);
+        throw new Error(`Invalid response from server (${response.status})`);
+    }
+
+    if (!response.ok) {
+        console.error('API: Error response:', responseData);
+        console.error('API: Response status:', response.status);
+        console.error('API: Full error object:', {
+            status: response.status,
+            statusText: response.statusText,
+            data: responseData
+        });
+
+        // Create a detailed error message
+        let errorMessage = 'Failed to create AI goal';
+        if (responseData.error) {
+            errorMessage += `: ${responseData.error}`;
+        } else if (responseData.message) {
+            errorMessage += `: ${responseData.message}`;
+        } else if (responseData.details) {
+            errorMessage += `: ${responseData.details}`;
+        } else {
+            errorMessage += ` (${response.status})`;
+        }
+
+        throw new Error(errorMessage);
+    }
+
+    console.log('API: Success response:', responseData);
+    return responseData;
+};

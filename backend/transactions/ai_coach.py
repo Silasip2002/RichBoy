@@ -93,11 +93,15 @@ def convert_currency(amount, from_currency, to_currency):
 class AICoachService:
     def __init__(self):
         self.api_key = os.getenv('GEMINI_API_KEY')
+        logger.info(f"GEMINI_API_KEY loaded: {'Yes' if self.api_key else 'No'}")
         if not self.api_key:
+            logger.error("GEMINI_API_KEY environment variable is not set")
             raise ValueError("GEMINI_API_KEY environment variable is not set")
+        logger.info(f"API Key length: {len(self.api_key)}")
         genai.configure(api_key=self.api_key)
         self.model = genai.GenerativeModel('gemini-2.0-flash')
         self.chat_model = genai.GenerativeModel('gemini-2.0-flash')
+        logger.info("AI Coach Service initialized successfully")
 
     def get_user_financial_data(self, user) -> Dict[str, Any]:
         """Aggregate all financial data for a user"""
@@ -299,11 +303,18 @@ class AICoachService:
             prompt = self._create_goal_chat_prompt(message, context)
 
             # Generate response
+            logger.info("Generating AI response...")
             response = self.chat_model.generate_content(prompt)
+            logger.info("AI response generated successfully")
             return response.text
 
         except Exception as e:
             logger.error(f"Error generating goal chat response: {e}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            # Check for specific API key errors
+            if "API key" in str(e).lower() or "permission" in str(e).lower():
+                logger.error("This appears to be an API key issue")
+                return "I'm having trouble accessing my AI capabilities. Please check the API configuration and try again."
             return "I'm having trouble responding right now. Please try again later."
 
     def _create_goal_chat_context(self, financial_data: Dict, goals_data: Dict, conversation_history: List[Dict] = None) -> str:
@@ -336,6 +347,103 @@ class AICoachService:
                 context += f"{sender}: {msg['message']}\n"
 
         return context
+
+    def extract_goal_from_conversation(self, user, conversation_history: List[Dict] = None) -> Dict[str, Any]:
+        """Extract goal information from conversation and create structured goal data"""
+        try:
+            # Get user's financial data for context
+            financial_data = self.get_user_financial_data(user)
+            context = self._create_goal_chat_context(financial_data, self.get_user_goals_data(user), conversation_history)
+
+            # Create prompt for goal extraction
+            prompt = f"""
+            You are a financial AI assistant. Based on the conversation, determine if the user has described a specific financial goal they want to create.
+
+            {context}
+
+            Analyze the conversation and determine:
+            1. Has the user described a specific, actionable financial goal?
+            2. If yes, extract the following information:
+               - Goal title (short, descriptive)
+               - Description (detailed explanation)
+               - Category (savings, debt_repayment, or investment)
+               - Target amount (in USD)
+               - Current amount (if mentioned, 0 if not)
+               - Deadline (if mentioned, null if not)
+               - Suggested milestones (2-4 actionable steps)
+
+            Be more liberal in creating goals - if the user mentions ANY financial objective, create a goal for it.
+            Common examples: saving for emergency fund, paying off debt, saving for house/car/vacation, investing for retirement, building wealth.
+
+            If the user hasn't provided enough information for a specific goal, respond with "INSUFFICIENT_INFO".
+            If the user has described a goal, respond with valid JSON in this format:
+            {{
+                "should_create_goal": true,
+                "goal_data": {{
+                    "title": "Goal title",
+                    "description": "Detailed description",
+                    "category": "savings|debt_repayment|investment",
+                    "target_amount": 10000,
+                    "current_amount": 1000,
+                    "deadline": "2025-12-31" or null,
+                    "milestones": [
+                        {{
+                            "title": "Milestone title",
+                            "description": "What to do",
+                            "target_date": "2024-06-30"
+                        }}
+                    ]
+                }}
+            }}
+
+            IMPORTANT: Always respond with valid JSON. Use reasonable estimates for amounts and dates if not specified.
+            Focus on: emergency funds, debt payoff, home purchases, retirement, education, large purchases, investment goals.
+            """
+
+            response = self.model.generate_content(prompt)
+            response_text = response.text.strip()
+
+            # Log the raw response for debugging
+            logger.info(f"AI goal extraction raw response: {response_text}")
+
+            # Try to parse as JSON
+            import json
+            import re
+
+            try:
+                # First try direct JSON parsing
+                result = json.loads(response_text)
+                if result.get('should_create_goal') and result.get('goal_data'):
+                    return {
+                        'success': True,
+                        'goal_data': result['goal_data']
+                    }
+                else:
+                    return {'success': False, 'reason': 'No clear goal identified'}
+            except json.JSONDecodeError:
+                # Try to extract JSON from the response using regex
+                json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+                if json_match:
+                    try:
+                        result = json.loads(json_match.group())
+                        if result.get('should_create_goal') and result.get('goal_data'):
+                            return {
+                                'success': True,
+                                'goal_data': result['goal_data']
+                            }
+                    except json.JSONDecodeError:
+                        pass
+
+                # Check if it's the insufficient info response
+                if "INSUFFICIENT_INFO" in response_text or "not enough" in response_text.lower():
+                    return {'success': False, 'reason': 'Insufficient information provided'}
+                else:
+                    logger.error(f"Failed to parse AI goal extraction response: {response_text}")
+                    return {'success': False, 'reason': 'Failed to process AI response'}
+
+        except Exception as e:
+            logger.error(f"Error extracting goal from conversation: {e}")
+            return {'success': False, 'reason': 'Error processing request'}
 
     def _create_goal_chat_prompt(self, user_message: str, context: str) -> str:
         """Create a prompt for goal-related chat"""

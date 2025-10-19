@@ -5,7 +5,8 @@ from .views import (
     CategoryViewSet,
     BudgetViewSet,
     get_ai_coach_advice,
-    ai_goal_chat
+    ai_goal_chat,
+    ai_create_goal
 )
 
 router = DefaultRouter()
@@ -17,4 +18,5 @@ urlpatterns = [
     path('', include(router.urls)),
     path('ai-coach-advice/', get_ai_coach_advice, name='ai-coach-advice'),
     path('ai-goal-chat/', ai_goal_chat, name='ai-goal-chat'),
+    path('ai-create-goal/', ai_create_goal, name='ai-create-goal'),
 ]

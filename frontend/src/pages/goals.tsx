@@ -21,6 +21,9 @@ import {
   InputBase,
   Checkbox,
   CircularProgress,
+  Skeleton,
+  Alert,
+  Fade,
 } from '@mui/material';
 import {
   Send,
@@ -34,33 +37,12 @@ import {
   CheckCircle,
   HelpOutline,
   Chat,
+  AutoAwesome,
+  Refresh,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { sendAIGoalChatMessage, ChatMessage } from '../services/api';
-
-interface Milestone {
-  id: string;
-  title: string;
-  description: string;
-  target_date: string;
-  completed: boolean;
-  status: 'completed' | 'in_progress' | 'upcoming';
-}
-
-interface Goal {
-  id: string;
-  title: string;
-  description: string;
-  target_amount: number;
-  current_amount: number;
-  deadline: string;
-  category: 'savings' | 'debt_repayment' | 'investment';
-  status: 'active' | 'completed' | 'paused';
-  milestones: Milestone[];
-  created_at: string;
-  updated_at: string;
-}
+import { sendAIGoalChatMessage, createAIGoal, ChatMessage, Goal, Milestone } from '../services/api';
 
 interface AIMessage {
   id: string;
@@ -76,6 +58,9 @@ const Goals: React.FC = () => {
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const [aiMessage, setAiMessage] = useState('');
   const [isLoadingAI, setIsLoadingAI] = useState(false);
+  const [isCreatingGoal, setIsCreatingGoal] = useState(false);
+  const [showAISuccess, setShowAISuccess] = useState(false);
+  const [aiGoalMessage, setAiGoalMessage] = useState('');
   const [aiMessages, setAiMessages] = useState<AIMessage[]>([
     {
       id: '1',
@@ -120,6 +105,68 @@ const Goals: React.FC = () => {
     },
     onSettled: () => {
       setIsLoadingAI(false);
+    }
+  });
+
+  // AI Goal Creation mutation
+  const aiGoalCreationMutation = useMutation({
+    mutationFn: (conversationHistory: ChatMessage[]) =>
+      createAIGoal(token!, conversationHistory),
+    onSuccess: (response) => {
+      console.log('AI Goal Creation success response:', response);
+
+      if (response.success && response.goal) {
+        console.log('AI goal created successfully:', response.goal);
+
+        // Add the AI-created goal to the goals list
+        queryClient.setQueryData(['goals'], (old: Goal[] = []) => {
+          console.log('Adding new goal to existing goals:', old);
+          return [...old, response.goal!];
+        });
+
+        // Show success message
+        setAiGoalMessage(response.message || 'Goal created successfully!');
+        setShowAISuccess(true);
+
+        // Switch to the category of the created goal
+        setSelectedCategory(response.goal.category);
+
+        // Add AI message about the created goal
+        const aiResponse: AIMessage = {
+          id: (Date.now() + 2).toString(),
+          sender: 'ai',
+          message: response.message || `Great! I've created the goal "${response.goal!.title}" for you. You can see it on the right side!`,
+          timestamp: new Date().toISOString()
+        };
+        setAiMessages(prev => [...prev, aiResponse]);
+
+        // Hide success message after 5 seconds
+        setTimeout(() => setShowAISuccess(false), 5000);
+      } else {
+        console.log('AI goal creation failed:', response);
+        // Add AI message about why goal couldn't be created
+        const aiResponse: AIMessage = {
+          id: (Date.now() + 1).toString(),
+          sender: 'ai',
+          message: response.message || "I couldn't create a goal from our conversation yet. Could you provide more details about what you'd like to achieve?",
+          timestamp: new Date().toISOString()
+        };
+        setAiMessages(prev => [...prev, aiResponse]);
+      }
+    },
+    onError: (error) => {
+      console.error('AI Goal Creation error:', error);
+      const errorMessage: AIMessage = {
+        id: (Date.now() + 1).toString(),
+        sender: 'ai',
+        message: "I had trouble creating a goal from our conversation. Let's continue discussing your financial objectives.",
+        timestamp: new Date().toISOString()
+      };
+      setAiMessages(prev => [...prev, errorMessage]);
+    },
+    onSettled: () => {
+      console.log('AI Goal Creation mutation settled');
+      setIsCreatingGoal(false);
     }
   });
 
@@ -267,6 +314,18 @@ const Goals: React.FC = () => {
     }
   };
 
+  const handleCreateAIGoal = () => {
+    if (aiMessages.length > 1 && token) { // Need at least one user message
+      console.log('Creating AI goal with messages:', aiMessages);
+      setIsCreatingGoal(true);
+
+      // Call AI goal creation API
+      aiGoalCreationMutation.mutate(aiMessages);
+    } else {
+      console.log('Cannot create goal: insufficient messages or no token');
+    }
+  };
+
   const handleMilestoneToggle = (goalId: string, milestoneId: string) => {
     // Mock milestone toggle - replace with actual API call
     console.log('Toggling milestone:', milestoneId, 'for goal:', goalId);
@@ -411,6 +470,41 @@ const Goals: React.FC = () => {
         </Box>
 
         <Box sx={{ p: 3, borderTop: 1, borderColor: 'divider' }}>
+          {/* AI Success Message */}
+          <Fade in={showAISuccess}>
+            <Alert
+              severity="success"
+              sx={{ mb: 2 }}
+              onClose={() => setShowAISuccess(false)}
+            >
+              {aiGoalMessage}
+            </Alert>
+          </Fade>
+
+          {/* AI Goal Creation Button */}
+          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+            <Button
+              variant="outlined"
+              onClick={handleCreateAIGoal}
+              disabled={isCreatingGoal || aiMessages.length <= 1}
+              startIcon={isCreatingGoal ? <CircularProgress size={16} /> : <AutoAwesome />}
+              sx={{
+                borderColor: 'success.main',
+                color: 'success.main',
+                '&:hover': {
+                  borderColor: 'success.dark',
+                  bgcolor: 'success.50',
+                },
+                '&:disabled': {
+                  borderColor: 'grey.300',
+                  color: 'grey.500',
+                }
+              }}
+            >
+              {isCreatingGoal ? 'Creating Goal...' : 'Create Goal from Conversation'}
+            </Button>
+          </Box>
+
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <InputBase
               fullWidth
@@ -504,8 +598,44 @@ const Goals: React.FC = () => {
           </Button>
         </Box>
 
+        {/* AI Goal Creation Skeleton */}
+        {isCreatingGoal && (
+          <Fade in={isCreatingGoal}>
+            <Paper sx={{ p: 4, mb: 3, borderRadius: 2, boxShadow: 1, border: 2, borderColor: 'success.main', borderStyle: 'dashed' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                <AutoAwesome sx={{ color: 'success.main', mr: 2 }} />
+                <Typography variant="h6" sx={{ color: 'success.main', fontWeight: 600 }}>
+                  AI is creating your goal...
+                </Typography>
+              </Box>
+
+              {/* Skeleton Loading */}
+              <Box>
+                <Skeleton variant="text" width="60%" height={32} sx={{ mb: 2 }} />
+                <Skeleton variant="text" width="80%" height={24} sx={{ mb: 3 }} />
+
+                <Skeleton variant="rectangular" width="100%" height={8} sx={{ mb: 1, borderRadius: 1 }} />
+                <Skeleton variant="text" width="40%" height={20} sx={{ mb: 3 }} />
+
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {[1, 2, 3].map((item) => (
+                    <Box key={item} sx={{ display: 'flex', alignItems: 'center', p: 2, border: 1, borderColor: 'grey.200', borderRadius: 2 }}>
+                      <Skeleton variant="circular" width={24} height={24} sx={{ mr: 2 }} />
+                      <Box sx={{ flex: 1 }}>
+                        <Skeleton variant="text" width="70%" height={20} sx={{ mb: 1 }} />
+                        <Skeleton variant="text" width="50%" height={16} />
+                      </Box>
+                      <Skeleton variant="text" width={80} height={20} />
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            </Paper>
+          </Fade>
+        )}
+
         {/* Goal Cards */}
-        {filteredGoals.length === 0 ? (
+        {filteredGoals.length === 0 && !isCreatingGoal ? (
           <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 2 }}>
             <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>
               No {selectedCategory.replace('_', ' ')} goals yet
@@ -520,14 +650,24 @@ const Goals: React.FC = () => {
           </Paper>
         ) : (
           filteredGoals.map((goal: Goal) => (
-            <Paper key={goal.id} sx={{ p: 4, mb: 3, borderRadius: 2, boxShadow: 1 }}>
+            <Paper key={goal.id} sx={{ p: 4, mb: 3, borderRadius: 2, boxShadow: 1, ...(goal.ai_generated && { border: 2, borderColor: 'success.light', borderStyle: 'solid' }) }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
                 <Box>
-                  <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 1 }}>
-                    {goal.title}
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                      {goal.title}
+                    </Typography>
+                    {goal.ai_generated && (
+                      <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: 'success.50', px: 1, py: 0.5, borderRadius: 1 }}>
+                        <AutoAwesome sx={{ fontSize: 16, color: 'success.main', mr: 0.5 }} />
+                        <Typography variant="caption" sx={{ color: 'success.main', fontWeight: 600 }}>
+                          AI Generated
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
                   <Typography variant="body1" color="text.secondary">
-                    Target: ${goal.target_amount.toLocaleString()} by {new Date(goal.deadline).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                    Target: ${goal.target_amount.toLocaleString()} by {goal.deadline ? new Date(goal.deadline).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'No deadline set'}
                   </Typography>
                 </Box>
 
