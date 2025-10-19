@@ -234,36 +234,6 @@ def ai_create_goal(request):
 
         logger.info(f"AI goal creation request with {len(conversation_history)} messages")
 
-        # For testing, let's create a simple goal without AI first
-        logger.info("Creating simple test goal (bypassing AI for now)")
-        goal_data = {
-            'title': 'Test Financial Goal',
-            'description': 'This is a test goal created from the AI conversation',
-            'category': 'savings',
-            'target_amount': 5000,
-            'current_amount': 0,
-            'deadline': (datetime.now() + timedelta(days=180)).strftime('%Y-%m-%d'),
-            'milestones': [
-                {
-                    'title': 'Start saving',
-                    'description': 'Begin your savings journey',
-                    'target_date': (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
-                },
-                {
-                    'title': 'Reach halfway',
-                    'description': 'Save $2,500 towards your goal',
-                    'target_date': (datetime.now() + timedelta(days=90)).strftime('%Y-%m-%d')
-                },
-                {
-                    'title': 'Complete goal',
-                    'description': 'Reach your $5,000 target',
-                    'target_date': (datetime.now() + timedelta(days=180)).strftime('%Y-%m-%d')
-                }
-            ]
-        }
-
-        # TODO: Uncomment this when AI is working properly
-        """
         # Try to use AI service, but fallback to simple logic if it fails
         try:
             ai_coach = AICoachService()
@@ -337,7 +307,6 @@ def ai_create_goal(request):
                     }
                 ]
             }
-        """
 
         # Generate milestone IDs and dates
         now = datetime.now()

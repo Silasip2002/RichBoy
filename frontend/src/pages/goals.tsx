@@ -1,22 +1,9 @@
 import React, { useState } from 'react';
 import {
   Box,
-  Grid,
-  Card,
-  CardContent,
-  CardActions,
   Typography,
   Button,
   IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Paper,
   InputBase,
   Checkbox,
@@ -24,13 +11,15 @@ import {
   Skeleton,
   Alert,
   Fade,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Chip,
+  Divider,
+  AccordionActions,
 } from '@mui/material';
 import {
   Send,
-  Add,
-  Edit,
-  Delete,
-  Flag,
   Savings,
   CreditCard,
   TrendingUp,
@@ -38,11 +27,14 @@ import {
   HelpOutline,
   Chat,
   AutoAwesome,
-  Refresh,
+  ExpandMore,
+  Calculate,
+  AccountBalance,
+  CalendarToday,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { sendAIGoalChatMessage, createAIGoal, ChatMessage, Goal, Milestone } from '../services/api';
+import { sendAIGoalChatMessage, createAIGoal, ChatMessage, Goal } from '../services/api';
 
 interface AIMessage {
   id: string;
@@ -53,14 +45,14 @@ interface AIMessage {
 
 const Goals: React.FC = () => {
   const { token } = useAuth();
-  const [openDialog, setOpenDialog] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<'savings' | 'debt_repayment' | 'investment'>('savings');
-  const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const [aiMessage, setAiMessage] = useState('');
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [isCreatingGoal, setIsCreatingGoal] = useState(false);
   const [showAISuccess, setShowAISuccess] = useState(false);
   const [aiGoalMessage, setAiGoalMessage] = useState('');
+  const [showCreateGoalSuggestion, setShowCreateGoalSuggestion] = useState(false);
+  const [expandedAccordions, setExpandedAccordions] = useState<Set<string>>(new Set());
   const [aiMessages, setAiMessages] = useState<AIMessage[]>([
     {
       id: '1',
@@ -69,14 +61,6 @@ const Goals: React.FC = () => {
       timestamp: new Date().toISOString()
     }
   ]);
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    target_amount: '',
-    current_amount: '',
-    deadline: '',
-    category: 'savings' as 'savings' | 'debt_repayment' | 'investment'
-  });
 
   const queryClient = useQueryClient();
 
@@ -92,6 +76,30 @@ const Goals: React.FC = () => {
         timestamp: response.timestamp
       };
       setAiMessages(prev => [...prev, aiResponse]);
+
+      // Check if AI is suggesting to create a goal
+      if (response.response.includes("enough information to create a goal") ||
+          response.response.includes("Create Goal from Conversation")) {
+        setShowCreateGoalSuggestion(true);
+        // Automatically create the goal after a short delay
+        setTimeout(() => {
+          if (!isCreatingGoal) {
+            handleCreateAIGoal();
+          }
+        }, 1500);
+      }
+
+      // Auto-suggest and create goal after 6 messages (3 exchanges)
+      const totalMessages = [...aiMessages, aiResponse];
+      if (totalMessages.length >= 6 && !showCreateGoalSuggestion) {
+        setShowCreateGoalSuggestion(true);
+        // Automatically create the goal after a short delay
+        setTimeout(() => {
+          if (!isCreatingGoal) {
+            handleCreateAIGoal();
+          }
+        }, 1500);
+      }
     },
     onError: (error) => {
       console.error('AI Chat error:', error);
@@ -140,8 +148,11 @@ const Goals: React.FC = () => {
         };
         setAiMessages(prev => [...prev, aiResponse]);
 
-        // Hide success message after 5 seconds
-        setTimeout(() => setShowAISuccess(false), 5000);
+        // Hide success message after 5 seconds and suggestion
+        setTimeout(() => {
+          setShowAISuccess(false);
+          setShowCreateGoalSuggestion(false);
+        }, 5000);
       } else {
         console.log('AI goal creation failed:', response);
         // Add AI message about why goal couldn't be created
@@ -254,45 +265,7 @@ const Goals: React.FC = () => {
     enabled: !!token,
   });
 
-  const handleOpenDialog = (goal?: Goal) => {
-    if (goal) {
-      setEditingGoal(goal);
-      setFormData({
-        title: goal.title,
-        description: goal.description,
-        target_amount: goal.target_amount.toString(),
-        current_amount: goal.current_amount.toString(),
-        deadline: goal.deadline,
-        category: goal.category
-      });
-    } else {
-      setEditingGoal(null);
-      setFormData({
-        title: '',
-        description: '',
-        target_amount: '',
-        current_amount: '',
-        deadline: '',
-        category: 'savings'
-      });
-    }
-    setOpenDialog(true);
-  };
-
-  const handleCloseDialog = () => {
-    setOpenDialog(false);
-    setEditingGoal(null);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Mock submission - replace with actual API call
-    console.log('Submitting goal:', formData);
-    handleCloseDialog();
-    // Invalidate query to refetch goals
-    queryClient.invalidateQueries({ queryKey: ['goals'] });
-  };
-
+  
   const handleSendMessage = () => {
     if (aiMessage.trim() && token) {
       const newMessage: AIMessage = {
@@ -331,18 +304,22 @@ const Goals: React.FC = () => {
     console.log('Toggling milestone:', milestoneId, 'for goal:', goalId);
   };
 
+  const handleAccordionToggle = (milestoneId: string) => {
+    setExpandedAccordions(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(milestoneId)) {
+        newSet.delete(milestoneId);
+      } else {
+        newSet.add(milestoneId);
+      }
+      return newSet;
+    });
+  };
+
   const getProgressPercentage = (current: number, target: number) => {
     return Math.min((current / target) * 100, 100);
   };
 
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'savings': return <Savings />;
-      case 'debt_repayment': return <CreditCard />;
-      case 'investment': return <TrendingUp />;
-      default: return <Flag />;
-    }
-  };
 
   const getMilestoneColor = (status: string) => {
     switch (status) {
@@ -363,6 +340,19 @@ const Goals: React.FC = () => {
   };
 
   const filteredGoals = goals.filter((goal: Goal) => goal.category === selectedCategory);
+
+  // Auto-expand accordions for AI-generated goals
+  React.useEffect(() => {
+    filteredGoals.forEach((goal: Goal) => {
+      if (goal.ai_generated) {
+        goal.milestones.forEach((milestone) => {
+          if (milestone.calculation || milestone.accordion_details || milestone.products?.length) {
+            setExpandedAccordions(prev => new Set([...prev, milestone.id]));
+          }
+        });
+      }
+    });
+  }, [filteredGoals]);
 
   if (isLoading) {
     return <Box sx={{ p: 3 }}>Loading goals...</Box>;
@@ -481,29 +471,16 @@ const Goals: React.FC = () => {
             </Alert>
           </Fade>
 
-          {/* AI Goal Creation Button */}
-          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
-            <Button
-              variant="outlined"
-              onClick={handleCreateAIGoal}
-              disabled={isCreatingGoal || aiMessages.length <= 1}
-              startIcon={isCreatingGoal ? <CircularProgress size={16} /> : <AutoAwesome />}
-              sx={{
-                borderColor: 'success.main',
-                color: 'success.main',
-                '&:hover': {
-                  borderColor: 'success.dark',
-                  bgcolor: 'success.50',
-                },
-                '&:disabled': {
-                  borderColor: 'grey.300',
-                  color: 'grey.500',
-                }
-              }}
+          {/* AI Goal Creation Suggestion */}
+          <Fade in={showCreateGoalSuggestion}>
+            <Alert
+              severity="info"
+              sx={{ mb: 2 }}
+              icon={<AutoAwesome />}
             >
-              {isCreatingGoal ? 'Creating Goal...' : 'Create Goal from Conversation'}
-            </Button>
-          </Box>
+              I'm creating a goal for you based on our conversation...
+            </Alert>
+          </Fade>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <InputBase
@@ -511,7 +488,7 @@ const Goals: React.FC = () => {
               placeholder="Type your message..."
               value={aiMessage}
               onChange={(e) => setAiMessage(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && !isLoadingAI && handleSendMessage()}
+              onKeyDown={(e) => e.key === 'Enter' && !isLoadingAI && handleSendMessage()}
               disabled={isLoadingAI}
               sx={{
                 px: 2,
@@ -579,23 +556,6 @@ const Goals: React.FC = () => {
               </Button>
             ))}
           </Box>
-
-          <Button
-            variant="contained"
-            onClick={() => handleOpenDialog()}
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1,
-              bgcolor: 'warning.main',
-              '&:hover': {
-                bgcolor: 'warning.dark'
-              }
-            }}
-          >
-            <Add />
-            Add a Goal
-          </Button>
         </Box>
 
         {/* AI Goal Creation Skeleton */}
@@ -640,13 +600,12 @@ const Goals: React.FC = () => {
             <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>
               No {selectedCategory.replace('_', ' ')} goals yet
             </Typography>
-            <Button
-              variant="contained"
-              onClick={() => handleOpenDialog()}
-              startIcon={<Add />}
-            >
-              Create Your First {selectedCategory === 'savings' ? 'Savings' : selectedCategory === 'debt_repayment' ? 'Debt Repayment' : 'Investment'} Goal
-            </Button>
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+              Chat with the AI assistant on the left to create your first {selectedCategory.replace('_', ' ')} goal!
+            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+              <Chat sx={{ fontSize: 48, color: 'primary.main', opacity: 0.5 }} />
+            </Box>
           </Paper>
         ) : (
           filteredGoals.map((goal: Goal) => (
@@ -667,13 +626,13 @@ const Goals: React.FC = () => {
                     )}
                   </Box>
                   <Typography variant="body1" color="text.secondary">
-                    Target: ${goal.target_amount.toLocaleString()} by {goal.deadline ? new Date(goal.deadline).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'No deadline set'}
+                    Target: $${goal.target_amount?.toLocaleString() || '0'} by {goal.deadline ? new Date(goal.deadline).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'No deadline set'}
                   </Typography>
                 </Box>
 
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {getProgressPercentage(goal.current_amount, goal.target_amount).toFixed(0)}% Complete
+                    {getProgressPercentage(goal.current_amount || 0, goal.target_amount || 1).toFixed(0)}% Complete
                   </Typography>
                   <IconButton size="small">
                     <HelpOutline fontSize="small" />
@@ -695,7 +654,7 @@ const Goals: React.FC = () => {
                 >
                   <Box
                     sx={{
-                      width: `${getProgressPercentage(goal.current_amount, goal.target_amount)}%`,
+                      width: `${getProgressPercentage(goal.current_amount || 0, goal.target_amount || 1)}%`,
                       height: '100%',
                       bgcolor: '#FFC107',
                       borderRadius: 4,
@@ -705,175 +664,238 @@ const Goals: React.FC = () => {
                 </Box>
               </Box>
 
-              {/* Milestones */}
+              {/* Enhanced Milestones with Accordion Details */}
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {goal.milestones.map((milestone) => (
-                  <Box
-                    key={milestone.id}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      p: 3,
-                      borderRadius: 2,
-                      border: 1,
-                      borderColor: milestone.status === 'completed' ? 'success.main' : 'divider',
-                      bgcolor: getMilestoneBgColor(milestone.status)
-                    }}
-                  >
-                    {milestone.status === 'completed' ? (
-                      <Box sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: 32,
-                        height: 32,
-                        borderRadius: '50%',
-                        bgcolor: 'success.main',
-                        mr: 3
-                      }}>
-                        <CheckCircle sx={{ color: 'white', fontSize: 20 }} />
-                      </Box>
-                    ) : (
-                      <Checkbox
-                        checked={milestone.completed}
-                        onChange={() => handleMilestoneToggle(goal.id, milestone.id)}
-                        sx={{ mr: 3 }}
-                      />
-                    )}
+                {goal.milestones.map((milestone) => {
+                  // Check if milestone has enhanced details
+                  const hasAccordionDetails = milestone.calculation || milestone.accordion_details || milestone.description;
 
-                    <Box sx={{ flex: 1 }}>
-                      <Typography
-                        variant="body1"
+                  return (
+                    <Box key={milestone.id}>
+                      {/* Main Milestone Item */}
+                      <Box
                         sx={{
-                          fontWeight: 600,
-                          textDecoration: milestone.status === 'completed' ? 'line-through' : 'none',
-                          color: milestone.status === 'completed' ? 'text.secondary' : 'text.primary'
+                          display: 'flex',
+                          alignItems: 'center',
+                          p: 3,
+                          borderRadius: 2,
+                          border: 1,
+                          borderColor: milestone.status === 'completed' ? 'success.main' : 'divider',
+                          bgcolor: getMilestoneBgColor(milestone.status),
+                          cursor: hasAccordionDetails ? 'pointer' : 'default'
+                        }}
+                        onClick={() => {
+                          if (hasAccordionDetails) {
+                            // Toggle accordion expansion logic here
+                            const accordionId = `accordion-${milestone.id}`;
+                            const accordion = document.getElementById(accordionId);
+                            if (accordion) {
+                              accordion.classList.toggle('expanded');
+                            }
+                          }
                         }}
                       >
-                        {milestone.title}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Target Date: {new Date(milestone.target_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                      </Typography>
-                    </Box>
+                        {milestone.status === 'completed' ? (
+                          <Box sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: 32,
+                            height: 32,
+                            borderRadius: '50%',
+                            bgcolor: 'success.main',
+                            mr: 3
+                          }}>
+                            <CheckCircle sx={{ color: 'white', fontSize: 20 }} />
+                          </Box>
+                        ) : (
+                          <Checkbox
+                            checked={milestone.completed}
+                            onChange={() => handleMilestoneToggle(goal.id, milestone.id)}
+                            sx={{ mr: 3 }}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        )}
 
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        fontWeight: 500,
-                        color: getMilestoneColor(milestone.status),
-                        textTransform: 'capitalize'
-                      }}
-                    >
-                      {milestone.status === 'completed' ? 'Completed!' : milestone.status === 'in_progress' ? 'In Progress' : 'Upcoming'}
-                    </Typography>
-                  </Box>
-                ))}
+                        <Box sx={{ flex: 1 }}>
+                          <Typography
+                            variant="body1"
+                            sx={{
+                              fontWeight: 600,
+                              textDecoration: milestone.status === 'completed' ? 'line-through' : 'none',
+                              color: milestone.status === 'completed' ? 'text.secondary' : 'text.primary',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1
+                            }}
+                          >
+                            {milestone.title}
+                            {hasAccordionDetails && (
+                              <ExpandMore sx={{
+                                fontSize: 20,
+                                color: 'primary.main',
+                                transition: 'transform 0.2s ease-in-out'
+                              }} />
+                            )}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Target Date: {milestone.target_date ? new Date(milestone.target_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'No date set'}
+                          </Typography>
+                          </Box>
+
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontWeight: 500,
+                            color: getMilestoneColor(milestone.status),
+                            textTransform: 'capitalize'
+                          }}
+                        >
+                          {milestone.status === 'completed' ? 'Completed!' : milestone.status === 'in_progress' ? 'In Progress' : 'Upcoming'}
+                        </Typography>
+                      </Box>
+
+                      {/* Accordion Details */}
+                      {hasAccordionDetails && (
+                        <Accordion
+                          expanded={expandedAccordions.has(milestone.id)}
+                          onChange={() => handleAccordionToggle(milestone.id)}
+                          sx={{
+                            mt: 1,
+                            boxShadow: 'none',
+                            border: 1,
+                            borderColor: 'primary.light',
+                            borderRadius: 2,
+                            '&:before': { display: 'none' },
+                            '&.Mui-expanded': {
+                              margin: '8px 0',
+                              '& .MuiAccordionSummary-expandIconWrapper': {
+                                transform: 'rotate(180deg)',
+                              },
+                            }
+                          }}
+                        >
+                          <AccordionSummary
+                            expandIcon={<ExpandMore />}
+                            sx={{
+                              px: 2,
+                              py: 1,
+                              minHeight: 'auto',
+                              bgcolor: 'primary.50',
+                              borderRadius: '8px 8px 0 0',
+                              '& .MuiAccordionSummary-content': {
+                                margin: '8px 0',
+                              }
+                            }}
+                          >
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'primary.main' }}>
+                              📋 Detailed Financial Plan & Implementation Steps
+                            </Typography>
+                          </AccordionSummary>
+                          <AccordionDetails sx={{ px: 2, pb: 2 }}>
+                            {/* Milestone Description */}
+                            {milestone.description && (
+                              <Box sx={{ mb: 2 }}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <HelpOutline sx={{ fontSize: 18, color: 'primary.main' }} />
+                                  Overview
+                                </Typography>
+                                <Paper sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                                  <Typography variant="body2" sx={{ whiteSpace: 'pre-line', lineHeight: 1.6 }}>
+                                    {milestone.description}
+                                  </Typography>
+                                </Paper>
+                              </Box>
+                            )}
+
+                            {/* Calculation Section */}
+                            {milestone.calculation && (
+                              <Box sx={{ mb: 2 }}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <Calculate sx={{ fontSize: 18, color: 'primary.main' }} />
+                                  Financial Calculation
+                                </Typography>
+                                <Paper sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                                  <Typography variant="body2" component="pre" sx={{ whiteSpace: 'pre-line', fontFamily: 'monospace', fontSize: '0.875rem', lineHeight: 1.6 }}>
+                                    {milestone.calculation}
+                                  </Typography>
+                                </Paper>
+                              </Box>
+                            )}
+
+                            {/* Accordion Details Section */}
+                            {milestone.accordion_details && (
+                              <Box sx={{ mb: 2 }}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <AccountBalance sx={{ fontSize: 18, color: 'primary.main' }} />
+                                  Implementation Steps
+                                </Typography>
+                                <Paper sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                                  <Typography variant="body2" component="pre" sx={{ whiteSpace: 'pre-line', fontFamily: 'monospace', fontSize: '0.875rem', lineHeight: 1.6 }}>
+                                    {milestone.accordion_details}
+                                  </Typography>
+                                </Paper>
+                              </Box>
+                            )}
+
+                            {/* Financial Products/Recommendations */}
+                            {milestone.products && milestone.products.length > 0 && (
+                              <Box sx={{ mb: 2 }}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <TrendingUp sx={{ fontSize: 18, color: 'primary.main' }} />
+                                  Recommended Products
+                                </Typography>
+                                <Paper sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                    {milestone.products.map((product, index: number) => (
+                                      <Box key={index} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, pb: 1, borderBottom: index < milestone.products!.length - 1 ? 1 : 0, borderColor: 'grey.200' }}>
+                                        <Chip
+                                          label={product.type || 'Product'}
+                                          size="small"
+                                          color="primary"
+                                          variant="outlined"
+                                          sx={{ minWidth: 80, flexShrink: 0 }}
+                                        />
+                                        <Box sx={{ flex: 1 }}>
+                                          <Typography variant="body2" sx={{ fontWeight: 500, mb: 0.5 }}>
+                                            {product.name}
+                                          </Typography>
+                                          <Typography variant="body2" color="text.secondary">
+                                            Amount: {product.amount} ({product.percentage}% allocation)
+                                          </Typography>
+                                        </Box>
+                                      </Box>
+                                    ))}
+                                  </Box>
+                                </Paper>
+                              </Box>
+                            )}
+
+                            {/* Timeline Information */}
+                            {milestone.timeline && (
+                              <Box>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <CalendarToday sx={{ fontSize: 18, color: 'primary.main' }} />
+                                  Timeline & Deadlines
+                                </Typography>
+                                <Paper sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                                  <Typography variant="body2" sx={{ whiteSpace: 'pre-line', lineHeight: 1.6 }}>
+                                    {milestone.timeline}
+                                  </Typography>
+                                </Paper>
+                              </Box>
+                            )}
+                          </AccordionDetails>
+                        </Accordion>
+                      )}
+                    </Box>
+                  );
+                })}
               </Box>
             </Paper>
           ))
         )}
       </Box>
-
-      {/* Add/Edit Goal Dialog */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {editingGoal ? 'Edit Goal' : 'Add New Goal'}
-        </DialogTitle>
-        <form onSubmit={handleSubmit}>
-          <DialogContent>
-            <TextField
-              autoFocus
-              margin="dense"
-              label="Goal Title"
-              fullWidth
-              variant="outlined"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              required
-              sx={{ mb: 2 }}
-            />
-
-            <TextField
-              margin="dense"
-              label="Description"
-              fullWidth
-              multiline
-              rows={3}
-              variant="outlined"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              sx={{ mb: 2 }}
-            />
-
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  margin="dense"
-                  label="Target Amount ($)"
-                  type="number"
-                  fullWidth
-                  variant="outlined"
-                  value={formData.target_amount}
-                  onChange={(e) => setFormData({ ...formData, target_amount: e.target.value })}
-                  required
-                />
-              </Grid>
-
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  margin="dense"
-                  label="Current Amount ($)"
-                  type="number"
-                  fullWidth
-                  variant="outlined"
-                  value={formData.current_amount}
-                  onChange={(e) => setFormData({ ...formData, current_amount: e.target.value })}
-                  required
-                />
-              </Grid>
-            </Grid>
-
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  margin="dense"
-                  label="Deadline"
-                  type="date"
-                  fullWidth
-                  variant="outlined"
-                  value={formData.deadline}
-                  onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-                  required
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
-
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth margin="dense">
-                  <InputLabel>Category</InputLabel>
-                  <Select
-                    value={formData.category}
-                    label="Category"
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
-                  >
-                    <MenuItem value="savings">Savings</MenuItem>
-                    <MenuItem value="debt_repayment">Debt Repayment</MenuItem>
-                    <MenuItem value="investment">Investment</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-            </Grid>
-          </DialogContent>
-
-          <DialogActions>
-            <Button onClick={handleCloseDialog}>Cancel</Button>
-            <Button type="submit" variant="contained">
-              {editingGoal ? 'Update Goal' : 'Add Goal'}
-            </Button>
-          </DialogActions>
-        </form>
-      </Dialog>
     </Box>
   );
 };

@@ -674,10 +674,20 @@ export interface Goal {
 export interface Milestone {
     id: string;
     title: string;
-    description: string;
+    description?: string;
     target_date: string;
     completed: boolean;
     status: 'completed' | 'in_progress' | 'upcoming';
+    // Enhanced fields from AI coach
+    calculation?: string;
+    accordion_details?: string;
+    products?: Array<{
+        type?: string;
+        name: string;
+        amount: string;
+        percentage: string;
+    }>;
+    timeline?: string;
 }
 
 export interface AICreateGoalResponse {
