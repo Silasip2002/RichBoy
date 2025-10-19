@@ -9,12 +9,16 @@ import MenuIcon from '@mui/icons-material/Menu';
 import Box from '@mui/material/Box';
 import richBoyLogo from '../resource/logo2.png';
 import Image from 'next/image';
+import { useAuth } from '../contexts/AuthContext';
+import { Avatar } from '@mui/material';
 
 interface HeaderProps {
   handleDrawerToggle: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ handleDrawerToggle }) => {
+  const { user } = useAuth();
+
   return (
     <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
       <Toolbar>
@@ -60,7 +64,11 @@ const Header: React.FC<HeaderProps> = ({ handleDrawerToggle }) => {
             aria-haspopup="true"
             color="inherit"
           >
-            <AccountCircle />
+            {user?.profile_picture ? (
+              <Avatar alt={user.display_name || 'User'} src={user.profile_picture} sx={{ width: 32, height: 32 }} />
+            ) : (
+              <AccountCircle />
+            )}
           </IconButton>
         </Box>
       </Toolbar>
