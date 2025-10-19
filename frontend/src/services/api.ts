@@ -614,3 +614,44 @@ export const getAICoachAdvice = async (token: string) => {
     console.log('API: Success response:', result);
     return result;
 };
+
+export interface ChatMessage {
+    id: string;
+    sender: 'ai' | 'user';
+    message: string;
+    timestamp: string;
+}
+
+export interface AIGoalChatResponse {
+    response: string;
+    timestamp: string;
+    error?: string;
+}
+
+export const sendAIGoalChatMessage = async (
+    token: string,
+    message: string,
+    conversationHistory: ChatMessage[]
+): Promise<AIGoalChatResponse> => {
+    console.log('API: Sending AI goal chat message...');
+    const response = await fetch(`${API_BASE_URL}/ai-goal-chat/`, {
+        method: 'POST',
+        headers: getAuthHeaders(token),
+        body: JSON.stringify({
+            message: message.trim(),
+            conversation_history: conversationHistory,
+        }),
+    });
+
+    console.log('API: Response status:', response.status);
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        console.error('API: Error response:', errorData);
+        throw new Error(errorData.error || `Failed to get AI response (${response.status})`);
+    }
+
+    const result = await response.json();
+    console.log('API: Success response:', result);
+    return result;
+};

@@ -2,6 +2,7 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from django.db import transaction as db_transaction
+from django.utils import timezone
 import logging
 
 from .models import Transaction, Budget
@@ -146,4 +147,50 @@ def get_ai_coach_advice(request):
         return Response({
             'error': 'Failed to generate financial advice',
             'advice': 'I\'m having trouble providing financial advice right now. Please try again later.',
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def ai_goal_chat(request):
+    """
+    Chat with AI coach about financial goals
+    """
+    try:
+        ai_coach = AICoachService()
+
+        # Get message and conversation history from request
+        message = request.data.get('message', '').strip()
+        conversation_history = request.data.get('conversation_history', [])
+
+        if not message:
+            return Response({
+                'error': 'Message is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Generate AI response
+        response = ai_coach.generate_goal_chat_response(
+            user=request.user,
+            message=message,
+            conversation_history=conversation_history
+        )
+
+        return Response({
+            'response': response,
+            'timestamp': timezone.now().isoformat()
+        })
+
+    except ValueError as e:
+        # Handle missing API key
+        logger.error(f"AI Coach configuration error: {e}")
+        return Response({
+            'error': 'AI Coach service is not properly configured',
+            'response': 'AI Coach is currently unavailable. Please contact support.',
+        }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    except Exception as e:
+        logger.error(f"Error in AI goal chat: {e}")
+        return Response({
+            'error': 'Failed to generate response',
+            'response': 'I\'m having trouble responding right now. Please try again later.',
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

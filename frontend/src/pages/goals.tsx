@@ -20,6 +20,7 @@ import {
   Paper,
   InputBase,
   Checkbox,
+  CircularProgress,
 } from '@mui/material';
 import {
   Send,
@@ -36,6 +37,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { sendAIGoalChatMessage, ChatMessage } from '../services/api';
 
 interface Milestone {
   id: string;
@@ -73,6 +75,7 @@ const Goals: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<'savings' | 'debt_repayment' | 'investment'>('savings');
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const [aiMessage, setAiMessage] = useState('');
+  const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [aiMessages, setAiMessages] = useState<AIMessage[]>([
     {
       id: '1',
@@ -91,6 +94,34 @@ const Goals: React.FC = () => {
   });
 
   const queryClient = useQueryClient();
+
+  // AI Chat mutation
+  const aiChatMutation = useMutation({
+    mutationFn: (data: { message: string; conversationHistory: ChatMessage[] }) =>
+      sendAIGoalChatMessage(token!, data.message, data.conversationHistory),
+    onSuccess: (response) => {
+      const aiResponse: AIMessage = {
+        id: (Date.now() + 1).toString(),
+        sender: 'ai',
+        message: response.response,
+        timestamp: response.timestamp
+      };
+      setAiMessages(prev => [...prev, aiResponse]);
+    },
+    onError: (error) => {
+      console.error('AI Chat error:', error);
+      const errorMessage: AIMessage = {
+        id: (Date.now() + 1).toString(),
+        sender: 'ai',
+        message: "I'm having trouble responding right now. Please try again later.",
+        timestamp: new Date().toISOString()
+      };
+      setAiMessages(prev => [...prev, errorMessage]);
+    },
+    onSettled: () => {
+      setIsLoadingAI(false);
+    }
+  });
 
   // Mock data for now - replace with actual API calls
   const { data: goals = [], isLoading } = useQuery({
@@ -216,25 +247,21 @@ const Goals: React.FC = () => {
   };
 
   const handleSendMessage = () => {
-    if (aiMessage.trim()) {
+    if (aiMessage.trim() && token) {
       const newMessage: AIMessage = {
         id: Date.now().toString(),
         sender: 'user',
         message: aiMessage,
         timestamp: new Date().toISOString()
       };
-      setAiMessages([...aiMessages, newMessage]);
+      setAiMessages(prev => [...prev, newMessage]);
+      setIsLoadingAI(true);
 
-      // Mock AI response
-      setTimeout(() => {
-        const aiResponse: AIMessage = {
-          id: (Date.now() + 1).toString(),
-          sender: 'ai',
-          message: "That's a great goal! Let me help you create a plan to achieve it. Would you like to set up monthly milestones?",
-          timestamp: new Date().toISOString()
-        };
-        setAiMessages(prev => [...prev, aiResponse]);
-      }, 1000);
+      // Call AI API
+      aiChatMutation.mutate({
+        message: aiMessage,
+        conversationHistory: [...aiMessages, newMessage]
+      });
 
       setAiMessage('');
     }
@@ -293,7 +320,29 @@ const Goals: React.FC = () => {
           </Typography>
         </Box>
 
-        <Box sx={{ flex: 1, p: 3, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <Box sx={{
+          flex: 1,
+          p: 3,
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 3,
+          maxHeight: 'calc(100vh - 280px)', // Prevent from getting too tall
+          '&::-webkit-scrollbar': {
+            width: '6px',
+          },
+          '&::-webkit-scrollbar-track': {
+            backgroundColor: '#f1f1f1',
+            borderRadius: '3px',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            backgroundColor: '#c1c1c1',
+            borderRadius: '3px',
+            '&:hover': {
+              backgroundColor: '#a8a8a8',
+            },
+          }
+        }}>
           {aiMessages.map((msg) => (
             <Box
               key={msg.id}
@@ -368,7 +417,8 @@ const Goals: React.FC = () => {
               placeholder="Type your message..."
               value={aiMessage}
               onChange={(e) => setAiMessage(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+              onKeyPress={(e) => e.key === 'Enter' && !isLoadingAI && handleSendMessage()}
+              disabled={isLoadingAI}
               sx={{
                 px: 2,
                 py: 1,
@@ -377,20 +427,24 @@ const Goals: React.FC = () => {
                 borderRadius: 2,
                 '&:focus-within': {
                   borderColor: 'primary.main'
+                },
+                '&.Mui-disabled': {
+                  bgcolor: 'grey.100'
                 }
               }}
             />
             <IconButton
               onClick={handleSendMessage}
+              disabled={isLoadingAI || !aiMessage.trim()}
               sx={{
-                bgcolor: 'primary.main',
+                bgcolor: isLoadingAI ? 'grey.400' : 'primary.main',
                 color: 'white',
                 '&:hover': {
-                  bgcolor: 'primary.dark'
+                  bgcolor: isLoadingAI ? 'grey.400' : 'primary.dark'
                 }
               }}
             >
-              <Send />
+              {isLoadingAI ? <CircularProgress size={20} sx={{ color: 'white' }} /> : <Send />}
             </IconButton>
           </Box>
         </Box>

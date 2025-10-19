@@ -97,6 +97,7 @@ class AICoachService:
             raise ValueError("GEMINI_API_KEY environment variable is not set")
         genai.configure(api_key=self.api_key)
         self.model = genai.GenerativeModel('gemini-2.0-flash')
+        self.chat_model = genai.GenerativeModel('gemini-2.0-flash')
 
     def get_user_financial_data(self, user) -> Dict[str, Any]:
         """Aggregate all financial data for a user"""
@@ -265,6 +266,96 @@ class AICoachService:
 
         Keep the response concise (around 150-200 words), friendly, and encouraging. Use bullet points for recommendations.
         Focus on practical steps they can take this month.
+        """
+
+        return prompt
+
+    def get_user_goals_data(self, user) -> Dict[str, Any]:
+        """Get user's goals data for chat context"""
+        try:
+            # This would be implemented when goals are added to the database
+            # For now, return a placeholder structure
+            return {
+                'active_goals': [],
+                'completed_goals': [],
+                'total_saved': 0,
+                'total_target': 0
+            }
+        except Exception as e:
+            logger.error(f"Error fetching user goals data: {e}")
+            return {'active_goals': [], 'completed_goals': [], 'total_saved': 0, 'total_target': 0}
+
+    def generate_goal_chat_response(self, user, message: str, conversation_history: List[Dict] = None) -> str:
+        """Generate a response for goal-related chat messages"""
+        try:
+            # Get user's financial and goals data
+            financial_data = self.get_user_financial_data(user)
+            goals_data = self.get_user_goals_data(user)
+
+            # Create conversation context
+            context = self._create_goal_chat_context(financial_data, goals_data, conversation_history)
+
+            # Create prompt with context
+            prompt = self._create_goal_chat_prompt(message, context)
+
+            # Generate response
+            response = self.chat_model.generate_content(prompt)
+            return response.text
+
+        except Exception as e:
+            logger.error(f"Error generating goal chat response: {e}")
+            return "I'm having trouble responding right now. Please try again later."
+
+    def _create_goal_chat_context(self, financial_data: Dict, goals_data: Dict, conversation_history: List[Dict] = None) -> str:
+        """Create context string for goal-related conversations"""
+        profile = financial_data.get('user_profile', {})
+        accounts = financial_data.get('accounts', {})
+        spending = financial_data.get('recent_spending', {})
+        assets = financial_data.get('assets', {})
+
+        context = f"""
+        USER CONTEXT:
+        - Age: {profile.get('age', 'Not specified')}
+        - Risk Preference: {profile.get('risk_preference', 'Not specified')}
+        - Total Balance: ${accounts.get('total_balance', 0):.2f}
+        - Recent Spending: ${spending.get('total_spent', 0):.2f}
+        - Total Assets: ${assets.get('total_value', 0):.2f}
+
+        GOALS CONTEXT:
+        - Active Goals: {len(goals_data.get('active_goals', []))}
+        - Completed Goals: {len(goals_data.get('completed_goals', []))}
+        - Total Saved: ${goals_data.get('total_saved', 0):.2f}
+        - Total Target: ${goals_data.get('total_target', 0):.2f}
+        """
+
+        # Add conversation history if provided
+        if conversation_history:
+            context += "\n\nRECENT CONVERSATION:\n"
+            for msg in conversation_history[-5:]:  # Last 5 messages for context
+                sender = "User" if msg['sender'] == 'user' else "AI Assistant"
+                context += f"{sender}: {msg['message']}\n"
+
+        return context
+
+    def _create_goal_chat_prompt(self, user_message: str, context: str) -> str:
+        """Create a prompt for goal-related chat"""
+        prompt = f"""
+        You are a friendly and helpful financial AI assistant specializing in helping users set and achieve their financial goals.
+
+        {context}
+
+        The user just sent this message: "{user_message}"
+
+        Please respond in a conversational, encouraging, and helpful manner. Your response should:
+        1. Directly address their question or comment
+        2. Provide practical advice related to their financial goals
+        3. Consider their financial situation and risk preference
+        4. Be encouraging and positive
+        5. Keep responses concise (2-4 sentences)
+        6. Ask follow-up questions when appropriate to keep the conversation going
+
+        Focus on goal-setting, saving strategies, motivation, and actionable financial advice.
+        Avoid giving investment advice unless specifically asked, and always include appropriate disclaimers.
         """
 
         return prompt
