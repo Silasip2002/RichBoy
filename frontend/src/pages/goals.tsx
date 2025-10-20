@@ -341,6 +341,106 @@ const Goals: React.FC = () => {
 
   const filteredGoals = goals.filter((goal: Goal) => goal.category === selectedCategory);
 
+  // Helper function to format financial text with proper currency formatting
+  const formatFinancialText = (text: string): string[] => {
+    // First, break down steps that are concatenated together
+    let processedText = text;
+
+    // Insert line breaks before "Step X:" patterns
+    processedText = processedText.replace(/([.!?])\s+Step\s+(\d+):/g, '$1\n\nStep $2:');
+
+    // Insert line breaks before "CALCULATION:" and "ACCORDION_DETAILS:"
+    processedText = processedText.replace(/([.!?])\s+(CALCULATION|ACCORDION_DETAILS):/g, '$1\n\n$2:');
+
+    // Insert line breaks before "Step X" without colon
+    processedText = processedText.replace(/([.!?])\s+Step\s+(\d+)(?=:)/g, '$1\n\nStep $2');
+
+    return processedText.split('\n').map(line => {
+      // Format currency values ($1000 -> $1,000, etc.)
+      return line.replace(/\$(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+)(?!\d)/g, (match, num) => {
+        const number = parseFloat(num.replace(/,/g, ''));
+        if (!isNaN(number)) {
+          return `$${number.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+        }
+        return match;
+      });
+    }).filter(line => line.trim() !== '');
+  };
+
+  // Helper function to format implementation steps
+  const formatImplementationSteps = (text: string): Array<{ text: string; details?: string }> => {
+    // First, break down concatenated text like we did for financial text
+    let processedText = text;
+
+    // Insert line breaks before "Step X:" patterns
+    processedText = processedText.replace(/([.!?])\s+Step\s+(\d+):/g, '$1\n\nStep $2:');
+
+    // Insert line breaks before "CALCULATION:" and "ACCORDION_DETAILS:"
+    processedText = processedText.replace(/([.!?])\s+(CALCULATION|ACCORDION_DETAILS):/g, '$1\n\n$2:');
+
+    // Insert line breaks before "Step X" without colon
+    processedText = processedText.replace(/([.!?])\s+Step\s+(\d+)(?=:)/g, '$1\n\nStep $2');
+
+    // Handle parentheses that contain step information
+    processedText = processedText.replace(/\)\.\s+Step\s+(\d+):/g, ').\n\nStep $1:');
+
+    const lines = processedText.split('\n').filter(line => line.trim() !== '');
+    const steps: Array<{ text: string; details?: string }> = [];
+
+    let currentStep = '';
+    let currentDetails: string[] = [];
+
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+
+      // Check if this is a new step (starts with "Step X:", number, bullet, or dash)
+      if (/^Step\s+\d+:/.test(trimmedLine) || /^\d+\./.test(trimmedLine) || /^[-*•]/.test(trimmedLine) ||
+          (/^[A-Z]/.test(trimmedLine) && currentStep && !/^CALCULATION:|^ACCORDION_DETAILS:/.test(trimmedLine))) {
+        // Save previous step
+        if (currentStep) {
+          steps.push({
+            text: currentStep,
+            details: currentDetails.length > 0 ? currentDetails.join(' ').trim() : undefined
+          });
+        }
+
+        // Start new step
+        if (/^Step\s+\d+:/.test(trimmedLine)) {
+          currentStep = trimmedLine.replace(/^Step\s+\d+:\s*/, '');
+        } else {
+          currentStep = trimmedLine.replace(/^(\d+\.|[-*•])\s*/, '');
+        }
+        currentDetails = [];
+      } else if (/^CALCULATION:|^ACCORDION_DETAILS:/.test(trimmedLine)) {
+        // Add calculation/details to current step
+        currentDetails.push(trimmedLine);
+      } else if (currentStep) {
+        // Add to current step details
+        if (trimmedLine.length > 0) {
+          currentDetails.push(trimmedLine);
+        }
+      } else {
+        // First step or single-line content
+        if (/^Step\s+\d+:/.test(trimmedLine)) {
+          currentStep = trimmedLine.replace(/^Step\s+\d+:\s*/, '');
+        } else {
+          currentStep = trimmedLine.replace(/^(\d+\.|[-*•])\s*/, '');
+        }
+        currentDetails = [];
+      }
+    }
+
+    // Don't forget the last step
+    if (currentStep) {
+      steps.push({
+        text: currentStep,
+        details: currentDetails.length > 0 ? currentDetails.join(' ').trim() : undefined
+      });
+    }
+
+    return steps.length > 0 ? steps : [{ text: text }];
+  };
+
   // Auto-expand accordions for AI-generated goals
   React.useEffect(() => {
     filteredGoals.forEach((goal: Goal) => {
@@ -798,12 +898,57 @@ const Goals: React.FC = () => {
                               <Box sx={{ mb: 2 }}>
                                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
                                   <HelpOutline sx={{ fontSize: 18, color: 'primary.main' }} />
-                                  Overview
+                                  Overview & Key Steps
                                 </Typography>
                                 <Paper sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                                  <Typography variant="body2" sx={{ whiteSpace: 'pre-line', lineHeight: 1.6 }}>
-                                    {milestone.description}
-                                  </Typography>
+                                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                    {formatFinancialText(milestone.description).map((line, index) => {
+                                      const isStep = /^Step\s+\d+:/.test(line);
+                                      const isCalculation = /^CALCULATION:|^ACCORDION_DETAILS:/.test(line);
+                                      const isImportant = /\$\d+/.test(line) && line.includes('%');
+
+                                      return (
+                                        <Box key={index} sx={{
+                                          display: 'flex',
+                                          alignItems: 'flex-start',
+                                          gap: 1,
+                                          p: isStep ? 1.5 : 1,
+                                          bgcolor: isStep ? 'white' : 'transparent',
+                                          borderRadius: 1,
+                                          border: isStep ? 1 : 0,
+                                          borderColor: isStep ? 'primary.light' : 'transparent'
+                                        }}>
+                                          {isStep && (
+                                            <Box sx={{
+                                              minWidth: 24,
+                                              height: 24,
+                                              borderRadius: '50%',
+                                              bgcolor: 'primary.main',
+                                              color: 'white',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              fontWeight: 600,
+                                              fontSize: '0.75rem',
+                                              mt: 0.25
+                                            }}>
+                                              {line.match(/Step\s+(\d+):/)?.[1] || '•'}
+                                            </Box>
+                                          )}
+                                          <Typography variant="body2" sx={{
+                                            lineHeight: 1.6,
+                                            fontSize: '0.875rem',
+                                            fontFamily: 'inherit',
+                                            fontWeight: isStep || isImportant ? 600 : 400,
+                                            color: isCalculation ? 'primary.main' : 'text.primary',
+                                            flex: 1
+                                          }}>
+                                            {line.replace(/^Step\s+\d+:\s*/, '').replace(/^(CALCULATION|ACCORDION_DETAILS):\s*/, '')}
+                                          </Typography>
+                                        </Box>
+                                      );
+                                    })}
+                                  </Box>
                                 </Paper>
                               </Box>
                             )}
@@ -816,9 +961,18 @@ const Goals: React.FC = () => {
                                   Financial Calculation
                                 </Typography>
                                 <Paper sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                                  <Typography variant="body2" component="pre" sx={{ whiteSpace: 'pre-line', fontFamily: 'monospace', fontSize: '0.875rem', lineHeight: 1.6 }}>
-                                    {milestone.calculation}
-                                  </Typography>
+                                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                    {formatFinancialText(milestone.calculation).map((line, index) => (
+                                      <Typography key={index} variant="body2" sx={{
+                                        lineHeight: 1.6,
+                                        fontFamily: 'inherit',
+                                        fontSize: '0.875rem',
+                                        '&:first-of-type': { fontWeight: 500, color: 'primary.main' }
+                                      }}>
+                                        {line}
+                                      </Typography>
+                                    ))}
+                                  </Box>
                                 </Paper>
                               </Box>
                             )}
@@ -831,9 +985,45 @@ const Goals: React.FC = () => {
                                   Implementation Steps
                                 </Typography>
                                 <Paper sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                                  <Typography variant="body2" component="pre" sx={{ whiteSpace: 'pre-line', fontFamily: 'monospace', fontSize: '0.875rem', lineHeight: 1.6 }}>
-                                    {milestone.accordion_details}
-                                  </Typography>
+                                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                    {formatImplementationSteps(milestone.accordion_details).map((step, index) => (
+                                      <Box key={index} sx={{
+                                        display: 'flex',
+                                        alignItems: 'flex-start',
+                                        gap: 2,
+                                        p: 2,
+                                        bgcolor: 'white',
+                                        borderRadius: 1,
+                                        border: 1,
+                                        borderColor: 'grey.200'
+                                      }}>
+                                        <Box sx={{
+                                          minWidth: 32,
+                                          height: 32,
+                                          borderRadius: '50%',
+                                          bgcolor: 'primary.main',
+                                          color: 'white',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          fontWeight: 600,
+                                          fontSize: '0.875rem'
+                                        }}>
+                                          {index + 1}
+                                        </Box>
+                                        <Box sx={{ flex: 1 }}>
+                                          <Typography variant="body2" sx={{ lineHeight: 1.6, fontSize: '0.875rem' }}>
+                                            {step.text}
+                                          </Typography>
+                                          {step.details && (
+                                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontSize: '0.8rem' }}>
+                                              {step.details}
+                                            </Typography>
+                                          )}
+                                        </Box>
+                                      </Box>
+                                    ))}
+                                  </Box>
                                 </Paper>
                               </Box>
                             )}
@@ -879,9 +1069,19 @@ const Goals: React.FC = () => {
                                   Timeline & Deadlines
                                 </Typography>
                                 <Paper sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                                  <Typography variant="body2" sx={{ whiteSpace: 'pre-line', lineHeight: 1.6 }}>
-                                    {milestone.timeline}
-                                  </Typography>
+                                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                    {formatFinancialText(milestone.timeline).map((line, index) => (
+                                      <Typography key={index} variant="body2" sx={{
+                                        lineHeight: 1.6,
+                                        fontSize: '0.875rem',
+                                        fontFamily: 'inherit',
+                                        color: line.includes('📅') || line.includes('⏰') ? 'primary.main' : 'text.primary',
+                                        fontWeight: line.includes('📅') || line.includes('⏰') ? 500 : 400
+                                      }}>
+                                        {line}
+                                      </Typography>
+                                    ))}
+                                  </Box>
                                 </Paper>
                               </Box>
                             )}
