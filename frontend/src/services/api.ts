@@ -671,23 +671,28 @@ export interface Goal {
     ai_generated?: boolean;
 }
 
+export interface FinancialProduct {
+    id: string;
+    type?: string;
+    name: string;
+    amount?: number;
+    percentage?: string;
+}
+
 export interface Milestone {
     id: string;
     title: string;
     description?: string;
-    target_date: string;
+    target_date?: string;
     completed: boolean;
     status: 'completed' | 'in_progress' | 'upcoming';
     // Enhanced fields from AI coach
     calculation?: string;
     accordion_details?: string;
-    products?: Array<{
-        type?: string;
-        name: string;
-        amount: string;
-        percentage: string;
-    }>;
     timeline?: string;
+    products?: FinancialProduct[];
+    created_at: string;
+    updated_at: string;
 }
 
 export interface AICreateGoalResponse {
@@ -753,4 +758,33 @@ export const createAIGoal = async (
 
     console.log('API: Success response:', responseData);
     return responseData;
+};
+
+export const getGoals = async (token: string): Promise<Goal[]> => {
+    const response = await fetch(`${API_BASE_URL}/goals/`, {
+        headers: getAuthHeaders(token),
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to fetch goals');
+    }
+
+    const data = await response.json();
+    return data.results || data;
+};
+
+export const toggleMilestone = async (token: string, goalId: string, milestoneId: string) => {
+    const response = await fetch(`${API_BASE_URL}/goals/${goalId}/toggle_milestone/`, {
+        method: 'POST',
+        headers: getAuthHeaders(token),
+        body: JSON.stringify({
+            milestone_id: milestoneId
+        }),
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to toggle milestone');
+    }
+
+    return response.json();
 };

@@ -15,8 +15,6 @@ import {
   AccordionSummary,
   AccordionDetails,
   Chip,
-  Divider,
-  AccordionActions,
 } from '@mui/material';
 import {
   Send,
@@ -34,7 +32,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { sendAIGoalChatMessage, createAIGoal, ChatMessage, Goal } from '../services/api';
+import { sendAIGoalChatMessage, createAIGoal, getGoals, toggleMilestone, ChatMessage, Goal } from '../services/api';
 
 interface AIMessage {
   id: string;
@@ -126,11 +124,8 @@ const Goals: React.FC = () => {
       if (response.success && response.goal) {
         console.log('AI goal created successfully:', response.goal);
 
-        // Add the AI-created goal to the goals list
-        queryClient.setQueryData(['goals'], (old: Goal[] = []) => {
-          console.log('Adding new goal to existing goals:', old);
-          return [...old, response.goal!];
-        });
+        // Invalidate goals query to refetch from database
+        queryClient.invalidateQueries({ queryKey: ['goals'] });
 
         // Show success message
         setAiGoalMessage(response.message || 'Goal created successfully!');
@@ -181,87 +176,10 @@ const Goals: React.FC = () => {
     }
   });
 
-  // Mock data for now - replace with actual API calls
+  // Fetch real goals from database
   const { data: goals = [], isLoading } = useQuery({
     queryKey: ['goals'],
-    queryFn: () => Promise.resolve([
-      {
-        id: '1',
-        title: 'Save for a Down Payment',
-        description: 'Build savings for house down payment',
-        target_amount: 50000,
-        current_amount: 10000,
-        deadline: '2025-12-31',
-        category: 'savings' as const,
-        status: 'active' as const,
-        milestones: [
-          {
-            id: '1',
-            title: 'Save your first $1,000',
-            description: 'Emergency starter fund',
-            target_date: '2024-03-31',
-            completed: true,
-            status: 'completed' as const
-          },
-          {
-            id: '2',
-            title: 'Set up automatic monthly transfers',
-            description: 'Automate savings contributions',
-            target_date: '2024-04-30',
-            completed: false,
-            status: 'in_progress' as const
-          },
-          {
-            id: '3',
-            title: 'Reach $10,000 savings',
-            description: 'First major milestone',
-            target_date: '2024-12-31',
-            completed: false,
-            status: 'upcoming' as const
-          },
-          {
-            id: '4',
-            title: 'Research mortgage options',
-            description: 'Understand loan requirements',
-            target_date: '2025-06-30',
-            completed: false,
-            status: 'upcoming' as const
-          }
-        ],
-        created_at: '2024-01-01',
-        updated_at: '2024-01-15'
-      },
-      {
-        id: '2',
-        title: 'Pay Off Credit Card Debt',
-        description: 'Eliminate high-interest credit card balances',
-        target_amount: 8000,
-        current_amount: 3000,
-        deadline: '2024-12-31',
-        category: 'debt_repayment' as const,
-        status: 'active' as const,
-        milestones: [
-          {
-            id: '5',
-            title: 'Stop using credit cards',
-            description: 'Switch to cash/debit only',
-            target_date: '2024-02-28',
-            completed: true,
-            status: 'completed' as const
-          },
-          {
-            id: '6',
-            title: 'Pay off highest interest card',
-            description: 'Focus on 24% APR card first',
-            target_date: '2024-06-30',
-            completed: false,
-            status: 'in_progress' as const
-          }
-        ],
-        created_at: '2024-01-05',
-        updated_at: '2024-01-20'
-      }
-    ]),
+    queryFn: () => getGoals(token!),
     enabled: !!token,
   });
 
@@ -299,9 +217,38 @@ const Goals: React.FC = () => {
     }
   };
 
+  // Milestone toggle mutation
+  const milestoneToggleMutation = useMutation({
+    mutationFn: (data: { goalId: string; milestoneId: string }) =>
+      toggleMilestone(token!, data.goalId, data.milestoneId),
+    onSuccess: (response, variables) => {
+      // Update the goal in the cache
+      queryClient.setQueryData(['goals'], (old: Goal[] = []) => {
+        return old.map(goal => {
+          if (goal.id === variables.goalId) {
+            return {
+              ...goal,
+              milestones: goal.milestones.map(milestone => {
+                if (milestone.id === variables.milestoneId) {
+                  return response;
+                }
+                return milestone;
+              })
+            };
+          }
+          return goal;
+        });
+      });
+    },
+    onError: (error) => {
+      console.error('Milestone toggle error:', error);
+    }
+  });
+
   const handleMilestoneToggle = (goalId: string, milestoneId: string) => {
-    // Mock milestone toggle - replace with actual API call
-    console.log('Toggling milestone:', milestoneId, 'for goal:', goalId);
+    if (token) {
+      milestoneToggleMutation.mutate({ goalId, milestoneId });
+    }
   };
 
   const handleAccordionToggle = (milestoneId: string) => {
@@ -465,7 +412,7 @@ const Goals: React.FC = () => {
         <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
           <Typography variant="h6" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center' }}>
             <Chat sx={{ mr: 2, color: 'primary.main' }} />
-            FinanceAI Assistant
+            AI RichBoy Assistant
           </Typography>
         </Box>
 
@@ -726,7 +673,7 @@ const Goals: React.FC = () => {
                     )}
                   </Box>
                   <Typography variant="body1" color="text.secondary">
-                    Target: $${goal.target_amount?.toLocaleString() || '0'} by {goal.deadline ? new Date(goal.deadline).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'No deadline set'}
+                    Target: ${goal.target_amount?.toLocaleString() || '0'} by {goal.deadline ? new Date(goal.deadline).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'No deadline set'}
                   </Typography>
                 </Box>
 
@@ -1037,7 +984,7 @@ const Goals: React.FC = () => {
                                 </Typography>
                                 <Paper sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
                                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                                    {milestone.products.map((product, index: number) => (
+                                    {milestone.products?.map((product, index: number) => (
                                       <Box key={index} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, pb: 1, borderBottom: index < milestone.products!.length - 1 ? 1 : 0, borderColor: 'grey.200' }}>
                                         <Chip
                                           label={product.type || 'Product'}
@@ -1051,7 +998,7 @@ const Goals: React.FC = () => {
                                             {product.name}
                                           </Typography>
                                           <Typography variant="body2" color="text.secondary">
-                                            Amount: {product.amount} ({product.percentage}% allocation)
+                                            Amount: {product.amount ? `$${product.amount.toLocaleString()}` : 'N/A'} ({product.percentage || 'N/A'}% allocation)
                                           </Typography>
                                         </Box>
                                       </Box>

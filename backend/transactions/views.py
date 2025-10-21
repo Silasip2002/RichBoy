@@ -1,14 +1,17 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, action
 from django.db import transaction as db_transaction
 from django.utils import timezone
 from datetime import datetime, timedelta
 import logging
 import uuid
 
-from .models import Transaction, Budget
-from .serializers import TransactionSerializer, CategorySerializer, BudgetSerializer
+from .models import Transaction, Budget, Goal, Milestone, FinancialProduct
+from .serializers import (
+    TransactionSerializer, CategorySerializer, BudgetSerializer,
+    GoalSerializer, GoalCreateSerializer, MilestoneSerializer
+)
 from .ai_coach import AICoachService
 from accounts.models import Account
 from richboy_backend.pagination import StandardResultsSetPagination
@@ -25,6 +28,50 @@ class BudgetViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+
+class GoalViewSet(viewsets.ModelViewSet):
+    serializer_class = GoalSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
+
+    def get_queryset(self):
+        return Goal.objects.filter(user=self.request.user).order_by('-created_at')
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return GoalCreateSerializer
+        return GoalSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def toggle_milestone(self, request, pk=None):
+        """Toggle milestone completion status"""
+        goal = self.get_object()
+        milestone_id = request.data.get('milestone_id')
+
+        try:
+            milestone = Milestone.objects.get(id=milestone_id, goal=goal)
+            milestone.completed = not milestone.completed
+            milestone.status = 'completed' if milestone.completed else 'in_progress'
+            milestone.save()
+
+            # Check if all milestones are completed
+            all_completed = all(m.completed for m in goal.milestones.all())
+            if all_completed:
+                goal.status = 'completed'
+                goal.current_amount = goal.target_amount
+                goal.save()
+
+            serializer = MilestoneSerializer(milestone)
+            return Response(serializer.data)
+        except Milestone.DoesNotExist:
+            return Response(
+                {'error': 'Milestone not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 class CategoryViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
@@ -334,11 +381,70 @@ def ai_create_goal(request):
 
         logger.info(f"Created complete goal object: {complete_goal['title']}")
 
-        return Response({
-            'success': True,
-            'goal': complete_goal,
-            'message': f"I've created a new goal for you: {goal_data['title']}"
-        })
+        # Save the goal to the database
+        try:
+            with db_transaction.atomic():
+                # Create the goal
+                goal = Goal.objects.create(
+                    id=complete_goal['id'],
+                    user=request.user,
+                    title=complete_goal['title'],
+                    description=complete_goal['description'],
+                    target_amount=complete_goal['target_amount'],
+                    current_amount=complete_goal['current_amount'],
+                    deadline=datetime.strptime(complete_goal['deadline'], '%Y-%m-%d').date() if complete_goal.get('deadline') else None,
+                    category=complete_goal['category'],
+                    status=complete_goal['status'],
+                    ai_generated=complete_goal['ai_generated']
+                )
+
+                # Create milestones
+                for milestone_data in complete_goal['milestones']:
+                    milestone = Milestone.objects.create(
+                        id=milestone_data['id'],
+                        goal=goal,
+                        title=milestone_data['title'],
+                        description=milestone_data.get('description'),
+                        target_date=datetime.strptime(milestone_data['target_date'], '%Y-%m-%d').date() if milestone_data.get('target_date') else None,
+                        completed=milestone_data['completed'],
+                        status=milestone_data['status'],
+                        calculation=milestone_data.get('calculation'),
+                        accordion_details=milestone_data.get('accordion_details'),
+                        timeline=milestone_data.get('timeline')
+                    )
+
+                    # Create financial products if they exist
+                    if 'products' in milestone_data:
+                        for product_data in milestone_data['products']:
+                            FinancialProduct.objects.create(
+                                milestone=milestone,
+                                type=product_data.get('type'),
+                                name=product_data['name'],
+                                amount=product_data['amount'].replace('$', '').replace(',', '') if product_data.get('amount') else None,
+                                percentage=product_data['percentage']
+                            )
+
+                # Serialize and return the created goal
+                serializer = GoalSerializer(goal)
+                logger.info(f"Goal saved to database with ID: {goal.id}")
+
+                return Response({
+                    'success': True,
+                    'goal': serializer.data,
+                    'message': f"I've created a new goal for you: {goal_data['title']}"
+                })
+
+        except Exception as db_error:
+            logger.error(f"Database error saving goal: {db_error}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+
+            # Return the goal data even if database save fails
+            return Response({
+                'success': True,
+                'goal': complete_goal,
+                'message': f"I've created a new goal for you: {goal_data['title']} (Note: Saved temporarily)"
+            })
 
     except ValueError as e:
         # Handle missing API key

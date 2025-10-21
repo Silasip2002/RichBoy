@@ -4,6 +4,7 @@ from .views import (
     TransactionViewSet,
     CategoryViewSet,
     BudgetViewSet,
+    GoalViewSet,
     get_ai_coach_advice,
     ai_goal_chat,
     ai_create_goal
@@ -13,6 +14,7 @@ router = DefaultRouter()
 router.register(r'transactions', TransactionViewSet, basename='transaction')
 router.register(r'categories', CategoryViewSet, basename='category')
 router.register(r'budgets', BudgetViewSet, basename='budget')
+router.register(r'goals', GoalViewSet, basename='goal')
 
 urlpatterns = [
     path('', include(router.urls)),

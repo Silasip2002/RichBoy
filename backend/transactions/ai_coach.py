@@ -344,9 +344,8 @@ class AICoachService:
         - Investment Timeline: Medium-term (3-5 years) recommended for balanced growth
 
         SPECIFIC PRODUCT ALLOCATION SUGGESTIONS:
-        - High-Yield Savings (Ally Bank 4.5% APY): ${available_for_investing * 0.3:.2f}
-        - S&P 500 Index Fund (VOO/FXAIAX): ${available_for_investing * 0.5:.2f}
-        - Bonds/Conservative Investments: ${available_for_investing * 0.2:.2f}
+        - Search online with real product to find the siutable proudct can fit the user and achive the user goal.
+        - Show the reason why you recommand these products provded with statistic.
 
         GOALS PROGRESS:
         - Active Goals: {len(goals_data.get('active_goals', []))}
@@ -684,9 +683,10 @@ class AICoachService:
         SPECIFICALLY INCLUDE:
 - Exact dollar amounts to save/month based on their goal
 - Specific bank account types (High-Yield Savings, CDs, Money Market)
-- Investment recommendations (index funds, ETFs) if appropriate for their risk level
+- Investment recommendations (index funds, ETFs,Stock, Bonds) if appropriate for their risk level
+- You may search online to get the real time market data for the investment recommendations
 - Exact allocation percentages for their money
-- Real financial institutions (examples: Ally Bank, Vanguard, Fidelity)
+- Real financial institutions, must vertify online information to make sure up to date. 
 - Step-by-step instructions to open accounts or set up transfers
 
 Example: "Based on your $50,000 balance and moderate risk tolerance, I recommend putting $30,000 in a Vanguard S&P 500 ETF (VOO), $15,000 in a high-yield savings account with Ally Bank (4.5% APY), and $5,000 in I Bonds for inflation protection. Set up automatic monthly transfers of $417 to reach your $25,000 down payment goal in 3 years."

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Transaction, CURRENCY_CHOICES, Budget
+from .models import Transaction, CURRENCY_CHOICES, Budget, Goal, Milestone, FinancialProduct
 
 class TransactionSerializer(serializers.ModelSerializer):
     user = serializers.ReadOnlyField(source='user.username')
@@ -92,3 +92,55 @@ class BudgetSerializer(serializers.ModelSerializer):
                 total_spent += transaction_amount
 
         return total_spent
+
+
+class FinancialProductSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FinancialProduct
+        fields = ['id', 'type', 'name', 'amount', 'percentage']
+
+
+class MilestoneSerializer(serializers.ModelSerializer):
+    products = FinancialProductSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Milestone
+        fields = ['id', 'title', 'description', 'target_date', 'completed', 'status',
+                  'calculation', 'accordion_details', 'timeline', 'products',
+                  'created_at', 'updated_at']
+
+
+class GoalSerializer(serializers.ModelSerializer):
+    milestones = MilestoneSerializer(many=True, read_only=True)
+    progress_percentage = serializers.ReadOnlyField()
+
+    class Meta:
+        model = Goal
+        fields = ['id', 'title', 'description', 'target_amount', 'current_amount',
+                  'deadline', 'category', 'status', 'ai_generated', 'progress_percentage',
+                  'milestones', 'created_at', 'updated_at']
+
+
+class GoalCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating goals with milestones"""
+    milestones = MilestoneSerializer(many=True, required=False)
+
+    class Meta:
+        model = Goal
+        fields = ['id', 'title', 'description', 'target_amount', 'current_amount',
+                  'deadline', 'category', 'status', 'ai_generated', 'milestones']
+
+    def create(self, validated_data):
+        milestones_data = validated_data.pop('milestones', [])
+        goal = Goal.objects.create(**validated_data)
+
+        # Create milestones
+        for milestone_data in milestones_data:
+            products_data = milestone_data.pop('products', [])
+            milestone = Milestone.objects.create(goal=goal, **milestone_data)
+
+            # Create financial products
+            for product_data in products_data:
+                FinancialProduct.objects.create(milestone=milestone, **product_data)
+
+        return goal
