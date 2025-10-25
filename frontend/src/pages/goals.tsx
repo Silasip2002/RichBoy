@@ -29,10 +29,11 @@ import {
   Calculate,
   AccountBalance,
   CalendarToday,
+  Delete,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { sendAIGoalChatMessage, createAIGoal, getGoals, toggleMilestone, ChatMessage, Goal } from '../services/api';
+import { sendAIGoalChatMessage, createAIGoal, getGoals, toggleMilestone, deleteGoal, ChatMessage, Goal } from '../services/api';
 
 interface AIMessage {
   id: string;
@@ -245,9 +246,29 @@ const Goals: React.FC = () => {
     }
   });
 
+  // Goal deletion mutation
+  const deleteGoalMutation = useMutation({
+    mutationFn: (goalId: string) => deleteGoal(token!, goalId),
+    onSuccess: (_, goalId) => {
+      // Remove the goal from the cache
+      queryClient.setQueryData(['goals'], (old: Goal[] = []) => {
+        return old.filter(goal => goal.id !== goalId);
+      });
+    },
+    onError: (error) => {
+      console.error('Goal deletion error:', error);
+    }
+  });
+
   const handleMilestoneToggle = (goalId: string, milestoneId: string) => {
     if (token) {
       milestoneToggleMutation.mutate({ goalId, milestoneId });
+    }
+  };
+
+  const handleDeleteGoal = (goalId: string) => {
+    if (token && window.confirm('Are you sure you want to delete this goal? This action cannot be undone.')) {
+      deleteGoalMutation.mutate(goalId);
     }
   };
 
@@ -683,6 +704,19 @@ const Goals: React.FC = () => {
                   </Typography>
                   <IconButton size="small">
                     <HelpOutline fontSize="small" />
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    onClick={() => handleDeleteGoal(goal.id)}
+                    sx={{
+                      color: 'error.main',
+                      '&:hover': {
+                        bgcolor: 'error.light',
+                        color: 'white'
+                      }
+                    }}
+                  >
+                    <Delete fontSize="small" />
                   </IconButton>
                 </Box>
               </Box>

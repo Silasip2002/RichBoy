@@ -788,3 +788,16 @@ export const toggleMilestone = async (token: string, goalId: string, milestoneId
 
     return response.json();
 };
+
+export const deleteGoal = async (token: string, goalId: string) => {
+    const response = await fetch(`${API_BASE_URL}/goals/${goalId}/`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(token),
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to delete goal');
+    }
+
+    return response;
+};
