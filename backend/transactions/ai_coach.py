@@ -669,7 +669,7 @@ class AICoachService:
 
         The user just sent this message: "{user_message}"
 
-        IMPORTANT RULE: After 5 total exchanges (including the initial greeting), OR if you have enough information to create a goal, tell the user "I have enough information to create a goal for you! Please click the 'Create Goal from Conversation' button below our chat." and suggest they create the goal.
+        IMPORTANT RULE: After 5 total exchanges (including the initial greeting), OR if you have enough information to create a goal, tell the user "I have enough information to create a goal for you!.
 
         Your response should:
         1. Directly address their question or comment
