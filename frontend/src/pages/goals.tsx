@@ -11,9 +11,6 @@ import {
   Skeleton,
   Alert,
   Fade,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   Chip,
 } from '@mui/material';
 import {
@@ -25,10 +22,6 @@ import {
   HelpOutline,
   Chat,
   AutoAwesome,
-  ExpandMore,
-  Calculate,
-  AccountBalance,
-  CalendarToday,
   Delete,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
@@ -51,7 +44,6 @@ const Goals: React.FC = () => {
   const [showAISuccess, setShowAISuccess] = useState(false);
   const [aiGoalMessage, setAiGoalMessage] = useState('');
   const [showCreateGoalSuggestion, setShowCreateGoalSuggestion] = useState(false);
-  const [expandedAccordions, setExpandedAccordions] = useState<Set<string>>(new Set());
   const [aiMessages, setAiMessages] = useState<AIMessage[]>([
     {
       id: '1',
@@ -272,18 +264,6 @@ const Goals: React.FC = () => {
     }
   };
 
-  const handleAccordionToggle = (milestoneId: string) => {
-    setExpandedAccordions(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(milestoneId)) {
-        newSet.delete(milestoneId);
-      } else {
-        newSet.add(milestoneId);
-      }
-      return newSet;
-    });
-  };
-
   const getProgressPercentage = (current: number, target: number) => {
     return Math.min((current / target) * 100, 100);
   };
@@ -309,119 +289,7 @@ const Goals: React.FC = () => {
 
   const filteredGoals = goals.filter((goal: Goal) => goal.category === selectedCategory);
 
-  // Helper function to format financial text with proper currency formatting
-  const formatFinancialText = (text: string): string[] => {
-    // First, break down steps that are concatenated together
-    let processedText = text;
-
-    // Insert line breaks before "Step X:" patterns
-    processedText = processedText.replace(/([.!?])\s+Step\s+(\d+):/g, '$1\n\nStep $2:');
-
-    // Insert line breaks before "CALCULATION:" and "ACCORDION_DETAILS:"
-    processedText = processedText.replace(/([.!?])\s+(CALCULATION|ACCORDION_DETAILS):/g, '$1\n\n$2:');
-
-    // Insert line breaks before "Step X" without colon
-    processedText = processedText.replace(/([.!?])\s+Step\s+(\d+)(?=:)/g, '$1\n\nStep $2');
-
-    return processedText.split('\n').map(line => {
-      // Format currency values ($1000 -> $1,000, etc.)
-      return line.replace(/\$(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+)(?!\d)/g, (match, num) => {
-        const number = parseFloat(num.replace(/,/g, ''));
-        if (!isNaN(number)) {
-          return `$${number.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
-        }
-        return match;
-      });
-    }).filter(line => line.trim() !== '');
-  };
-
-  // Helper function to format implementation steps
-  const formatImplementationSteps = (text: string): Array<{ text: string; details?: string }> => {
-    // First, break down concatenated text like we did for financial text
-    let processedText = text;
-
-    // Insert line breaks before "Step X:" patterns
-    processedText = processedText.replace(/([.!?])\s+Step\s+(\d+):/g, '$1\n\nStep $2:');
-
-    // Insert line breaks before "CALCULATION:" and "ACCORDION_DETAILS:"
-    processedText = processedText.replace(/([.!?])\s+(CALCULATION|ACCORDION_DETAILS):/g, '$1\n\n$2:');
-
-    // Insert line breaks before "Step X" without colon
-    processedText = processedText.replace(/([.!?])\s+Step\s+(\d+)(?=:)/g, '$1\n\nStep $2');
-
-    // Handle parentheses that contain step information
-    processedText = processedText.replace(/\)\.\s+Step\s+(\d+):/g, ').\n\nStep $1:');
-
-    const lines = processedText.split('\n').filter(line => line.trim() !== '');
-    const steps: Array<{ text: string; details?: string }> = [];
-
-    let currentStep = '';
-    let currentDetails: string[] = [];
-
-    for (const line of lines) {
-      const trimmedLine = line.trim();
-
-      // Check if this is a new step (starts with "Step X:", number, bullet, or dash)
-      if (/^Step\s+\d+:/.test(trimmedLine) || /^\d+\./.test(trimmedLine) || /^[-*•]/.test(trimmedLine) ||
-          (/^[A-Z]/.test(trimmedLine) && currentStep && !/^CALCULATION:|^ACCORDION_DETAILS:/.test(trimmedLine))) {
-        // Save previous step
-        if (currentStep) {
-          steps.push({
-            text: currentStep,
-            details: currentDetails.length > 0 ? currentDetails.join(' ').trim() : undefined
-          });
-        }
-
-        // Start new step
-        if (/^Step\s+\d+:/.test(trimmedLine)) {
-          currentStep = trimmedLine.replace(/^Step\s+\d+:\s*/, '');
-        } else {
-          currentStep = trimmedLine.replace(/^(\d+\.|[-*•])\s*/, '');
-        }
-        currentDetails = [];
-      } else if (/^CALCULATION:|^ACCORDION_DETAILS:/.test(trimmedLine)) {
-        // Add calculation/details to current step
-        currentDetails.push(trimmedLine);
-      } else if (currentStep) {
-        // Add to current step details
-        if (trimmedLine.length > 0) {
-          currentDetails.push(trimmedLine);
-        }
-      } else {
-        // First step or single-line content
-        if (/^Step\s+\d+:/.test(trimmedLine)) {
-          currentStep = trimmedLine.replace(/^Step\s+\d+:\s*/, '');
-        } else {
-          currentStep = trimmedLine.replace(/^(\d+\.|[-*•])\s*/, '');
-        }
-        currentDetails = [];
-      }
-    }
-
-    // Don't forget the last step
-    if (currentStep) {
-      steps.push({
-        text: currentStep,
-        details: currentDetails.length > 0 ? currentDetails.join(' ').trim() : undefined
-      });
-    }
-
-    return steps.length > 0 ? steps : [{ text: text }];
-  };
-
-  // Auto-expand accordions for AI-generated goals
-  React.useEffect(() => {
-    filteredGoals.forEach((goal: Goal) => {
-      if (goal.ai_generated) {
-        goal.milestones.forEach((milestone) => {
-          if (milestone.calculation || milestone.accordion_details || milestone.products?.length) {
-            setExpandedAccordions(prev => new Set([...prev, milestone.id]));
-          }
-        });
-      }
-    });
-  }, [filteredGoals]);
-
+  
   if (isLoading) {
     return <Box sx={{ p: 3 }}>Loading goals...</Box>;
   }
@@ -811,13 +679,6 @@ const Goals: React.FC = () => {
                             }}
                           >
                             {milestone.title}
-                            {hasAccordionDetails && (
-                              <ExpandMore sx={{
-                                fontSize: 20,
-                                color: 'primary.main',
-                                transition: 'transform 0.2s ease-in-out'
-                              }} />
-                            )}
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
                             Target Date: {milestone.target_date ? new Date(milestone.target_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'No date set'}
@@ -836,238 +697,101 @@ const Goals: React.FC = () => {
                         </Typography>
                       </Box>
 
-                      {/* Accordion Details */}
+                      {/* Simple AI Conversation Breakdown */}
                       {hasAccordionDetails && (
-                        <Accordion
-                          expanded={expandedAccordions.has(milestone.id)}
-                          onChange={() => handleAccordionToggle(milestone.id)}
+                        <Box
                           sx={{
                             mt: 1,
-                            boxShadow: 'none',
-                            border: 1,
-                            borderColor: 'primary.light',
+                            p: 3,
+                            bgcolor: 'primary.50',
                             borderRadius: 2,
-                            '&:before': { display: 'none' },
-                            '&.Mui-expanded': {
-                              margin: '8px 0',
-                              '& .MuiAccordionSummary-expandIconWrapper': {
-                                transform: 'rotate(180deg)',
-                              },
-                            }
+                            border: 1,
+                            borderColor: 'primary.light'
                           }}
                         >
-                          <AccordionSummary
-                            expandIcon={<ExpandMore />}
-                            sx={{
-                              px: 2,
-                              py: 1,
-                              minHeight: 'auto',
-                              bgcolor: 'primary.50',
-                              borderRadius: '8px 8px 0 0',
-                              '& .MuiAccordionSummary-content': {
-                                margin: '8px 0',
-                              }
-                            }}
-                          >
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'primary.main' }}>
-                              📋 Detailed Financial Plan & Implementation Steps
-                            </Typography>
-                          </AccordionSummary>
-                          <AccordionDetails sx={{ px: 2, pb: 2 }}>
-                            {/* Milestone Description */}
-                            {milestone.description && (
-                              <Box sx={{ mb: 2 }}>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                  <HelpOutline sx={{ fontSize: 18, color: 'primary.main' }} />
-                                  Overview & Key Steps
-                                </Typography>
-                                <Paper sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                                    {formatFinancialText(milestone.description).map((line, index) => {
-                                      const isStep = /^Step\s+\d+:/.test(line);
-                                      const isCalculation = /^CALCULATION:|^ACCORDION_DETAILS:/.test(line);
-                                      const isImportant = /\$\d+/.test(line) && line.includes('%');
+                          <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: 'primary.main' }}>
+                            💬 AI Conversation Breakdown
+                          </Typography>
 
-                                      return (
-                                        <Box key={index} sx={{
-                                          display: 'flex',
-                                          alignItems: 'flex-start',
-                                          gap: 1,
-                                          p: isStep ? 1.5 : 1,
-                                          bgcolor: isStep ? 'white' : 'transparent',
-                                          borderRadius: 1,
-                                          border: isStep ? 1 : 0,
-                                          borderColor: isStep ? 'primary.light' : 'transparent'
-                                        }}>
-                                          {isStep && (
-                                            <Box sx={{
-                                              minWidth: 24,
-                                              height: 24,
-                                              borderRadius: '50%',
-                                              bgcolor: 'primary.main',
-                                              color: 'white',
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center',
-                                              fontWeight: 600,
-                                              fontSize: '0.75rem',
-                                              mt: 0.25
-                                            }}>
-                                              {line.match(/Step\s+(\d+):/)?.[1] || '•'}
-                                            </Box>
-                                          )}
-                                          <Typography variant="body2" sx={{
-                                            lineHeight: 1.6,
-                                            fontSize: '0.875rem',
-                                            fontFamily: 'inherit',
-                                            fontWeight: isStep || isImportant ? 600 : 400,
-                                            color: isCalculation ? 'primary.main' : 'text.primary',
-                                            flex: 1
-                                          }}>
-                                            {line.replace(/^Step\s+\d+:\s*/, '').replace(/^(CALCULATION|ACCORDION_DETAILS):\s*/, '')}
-                                          </Typography>
-                                        </Box>
-                                      );
-                                    })}
-                                  </Box>
-                                </Paper>
-                              </Box>
-                            )}
+                          {/* Show description directly */}
+                          {milestone.description && (
+                            <Box sx={{ mb: 3 }}>
+                              <Typography variant="body1" sx={{ lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                                {milestone.description}
+                              </Typography>
+                            </Box>
+                          )}
 
-                            {/* Calculation Section */}
-                            {milestone.calculation && (
-                              <Box sx={{ mb: 2 }}>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                  <Calculate sx={{ fontSize: 18, color: 'primary.main' }} />
-                                  Financial Calculation
+                          {/* Show implementation details directly */}
+                          {milestone.accordion_details && (
+                            <Box sx={{ mb: 3 }}>
+                              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
+                                📋 Action Steps from AI Chat:
+                              </Typography>
+                              <Box sx={{ pl: 2 }}>
+                                <Typography variant="body2" sx={{ lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                                  {milestone.accordion_details}
                                 </Typography>
-                                <Paper sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                    {formatFinancialText(milestone.calculation).map((line, index) => (
-                                      <Typography key={index} variant="body2" sx={{
-                                        lineHeight: 1.6,
-                                        fontFamily: 'inherit',
-                                        fontSize: '0.875rem',
-                                        '&:first-of-type': { fontWeight: 500, color: 'primary.main' }
-                                      }}>
-                                        {line}
-                                      </Typography>
-                                    ))}
-                                  </Box>
-                                </Paper>
                               </Box>
-                            )}
+                            </Box>
+                          )}
 
-                            {/* Accordion Details Section */}
-                            {milestone.accordion_details && (
-                              <Box sx={{ mb: 2 }}>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                  <AccountBalance sx={{ fontSize: 18, color: 'primary.main' }} />
-                                  Implementation Steps
+                          {/* Show calculation details directly */}
+                          {milestone.calculation && (
+                            <Box sx={{ mb: 3 }}>
+                              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
+                                🧮 Financial Calculations:
+                              </Typography>
+                              <Box sx={{ pl: 2, bgcolor: 'white', p: 2, borderRadius: 1 }}>
+                                <Typography variant="body2" sx={{ lineHeight: 1.6, whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
+                                  {milestone.calculation}
                                 </Typography>
-                                <Paper sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                    {formatImplementationSteps(milestone.accordion_details).map((step, index) => (
-                                      <Box key={index} sx={{
-                                        display: 'flex',
-                                        alignItems: 'flex-start',
-                                        gap: 2,
-                                        p: 2,
-                                        bgcolor: 'white',
-                                        borderRadius: 1,
-                                        border: 1,
-                                        borderColor: 'grey.200'
-                                      }}>
-                                        <Box sx={{
-                                          minWidth: 32,
-                                          height: 32,
-                                          borderRadius: '50%',
-                                          bgcolor: 'primary.main',
-                                          color: 'white',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          fontWeight: 600,
-                                          fontSize: '0.875rem'
-                                        }}>
-                                          {index + 1}
-                                        </Box>
-                                        <Box sx={{ flex: 1 }}>
-                                          <Typography variant="body2" sx={{ lineHeight: 1.6, fontSize: '0.875rem' }}>
-                                            {step.text}
-                                          </Typography>
-                                          {step.details && (
-                                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontSize: '0.8rem' }}>
-                                              {step.details}
-                                            </Typography>
-                                          )}
-                                        </Box>
-                                      </Box>
-                                    ))}
-                                  </Box>
-                                </Paper>
                               </Box>
-                            )}
+                            </Box>
+                          )}
 
-                            {/* Financial Products/Recommendations */}
-                            {milestone.products && milestone.products.length > 0 && (
-                              <Box sx={{ mb: 2 }}>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                  <TrendingUp sx={{ fontSize: 18, color: 'primary.main' }} />
-                                  Recommended Products
+                          {/* Show timeline directly */}
+                          {milestone.timeline && (
+                            <Box sx={{ mb: 3 }}>
+                              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
+                                📅 Timeline from AI Chat:
+                              </Typography>
+                              <Box sx={{ pl: 2 }}>
+                                <Typography variant="body2" sx={{ lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                                  {milestone.timeline}
                                 </Typography>
-                                <Paper sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                                    {milestone.products?.map((product, index: number) => (
-                                      <Box key={index} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, pb: 1, borderBottom: index < milestone.products!.length - 1 ? 1 : 0, borderColor: 'grey.200' }}>
-                                        <Chip
-                                          label={product.type || 'Product'}
-                                          size="small"
-                                          color="primary"
-                                          variant="outlined"
-                                          sx={{ minWidth: 80, flexShrink: 0 }}
-                                        />
-                                        <Box sx={{ flex: 1 }}>
-                                          <Typography variant="body2" sx={{ fontWeight: 500, mb: 0.5 }}>
-                                            {product.name}
-                                          </Typography>
-                                          <Typography variant="body2" color="text.secondary">
-                                            Amount: {product.amount ? `$${product.amount.toLocaleString()}` : 'N/A'} ({product.percentage || 'N/A'}% allocation)
-                                          </Typography>
-                                        </Box>
-                                      </Box>
-                                    ))}
-                                  </Box>
-                                </Paper>
                               </Box>
-                            )}
+                            </Box>
+                          )}
 
-                            {/* Timeline Information */}
-                            {milestone.timeline && (
-                              <Box>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                  <CalendarToday sx={{ fontSize: 18, color: 'primary.main' }} />
-                                  Timeline & Deadlines
-                                </Typography>
-                                <Paper sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                    {formatFinancialText(milestone.timeline).map((line, index) => (
-                                      <Typography key={index} variant="body2" sx={{
-                                        lineHeight: 1.6,
-                                        fontSize: '0.875rem',
-                                        fontFamily: 'inherit',
-                                        color: line.includes('📅') || line.includes('⏰') ? 'primary.main' : 'text.primary',
-                                        fontWeight: line.includes('📅') || line.includes('⏰') ? 500 : 400
-                                      }}>
-                                        {line}
-                                      </Typography>
-                                    ))}
+                          {/* Show recommended products directly */}
+                          {milestone.products && milestone.products.length > 0 && (
+                            <Box>
+                              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
+                                💰 Products Recommended by AI:
+                              </Typography>
+                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                {milestone.products.map((product, index: number) => (
+                                  <Box key={index} sx={{
+                                    p: 2,
+                                    bgcolor: 'white',
+                                    borderRadius: 1,
+                                    border: 1,
+                                    borderColor: 'grey.200'
+                                  }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 500, mb: 1 }}>
+                                      {product.name}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                      {product.type} • {product.amount ? `$${product.amount.toLocaleString()}` : 'Amount N/A'}
+                                      {product.percentage && ` • ${product.percentage}% allocation`}
+                                    </Typography>
                                   </Box>
-                                </Paper>
+                                ))}
                               </Box>
-                            )}
-                          </AccordionDetails>
-                        </Accordion>
+                            </Box>
+                          )}
+                        </Box>
                       )}
                     </Box>
                   );

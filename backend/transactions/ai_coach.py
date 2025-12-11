@@ -579,7 +579,15 @@ class AICoachService:
                         {{
                             "title": "Comprehensive action step",
                             "description": "Complete step incorporating multiple conversation details. Example: 'Step 1: Open Ally Bank High-Yield Savings account (4.5% APY) at ally.com using the $2,000 we discussed. Step 2: Transfer from your current checking account (Bank of America) and set up automatic $500/month transfer on payday (the 1st and 15th). Step 3: Download Ally Bank app to monitor progress. Step 4: Email confirmation to ally@ally.com when completed.'",
-                            "target_date": "specific_date_based_on_timeline"
+                            "target_date": "specific_date_based_on_timeline",
+                            "products": [
+                                {{
+                                    "type": "savings_account|investment_fund|etf|stock|bond|bank_account|credit_card|loan|other",
+                                    "name": "Exact product name mentioned in conversation",
+                                    "amount": numeric_amount_or_null,
+                                    "percentage": "percentage_string_or_null"
+                                }}
+                            ]
                         }}
                     ]
                 }}
@@ -595,6 +603,13 @@ class AICoachService:
 - Each todo should build on previous ones using the complete conversation flow
 - MUST include CALCULATION section showing the math based on chat discussion
 - MUST include ACCORDION_DETAILS with comprehensive breakdown from all chat information
+- CRITICAL: MUST extract ALL financial products mentioned in conversation and include them in the "products" array with proper type, name, amount, and percentage
+- SPECIFIC PRODUCT NAMES REQUIRED: Extract EXACT product names like "ARK Innovation ETF (ARKK)", "iShares Exponential Technologies ETF (XT)", "iShares iBoxx High Yield Corporate Bond ETF (HYG)", "Fidelity brokerage", "Charles Schwab"
+- DO NOT use generic terms like "high-growth ETFs" - use the EXACT names mentioned
+- Extract TICKER SYMBOLS (ARKK, XT, HYG) and include them in the product name
+- Extract COMPANY NAMES (Fidelity, Charles Schwab, Ally Bank, Vanguard)
+- Extract EXACT dollar amounts mentioned in conversation
+- Every product mentioned in the chat MUST appear in the products array
 
             FORMAT FOR COMPREHENSIVE TODOS:
 - Each milestone must include: WHAT to do, HOW MUCH, WHERE to do it, WHEN to do it, and EXACT STEPS
@@ -610,7 +625,65 @@ class AICoachService:
 - Break down large tasks into smaller, manageable steps with specific amounts
 
             EXAMPLE COMPREHENSIVE TODO ITEM FROM CONVERSATION:
-            "Step 1: Establish Emergency Fund (6 months expenses: $24,000) in Ally High-Yield Savings (4.5% APY). CALCULATION: Monthly expenses $4,000 × 6 months = $24,000 fund. This covers unemployment, medical emergencies, car repairs, home repairs based on our conversation. Step 1: Go to ally.com within 3 days, complete application using SSN and government ID as discussed. Step 2: Transfer $24,000 from Bank of America checking (30% of your $80,000 total balance). Step 3: Set up monthly auto-deposit of $200 to grow fund to $30,000 target we discussed. Step 4: Download Ally Bank app, enable balance alerts at $20,000 and $30,000. Expected completion: 1 week. ACCORDION_DETAILS: Fund allocation strategy: 100% liquid savings, no investments as recommended in our chat. Can cover 6 months of living expenses including rent/mortgage $2,500, utilities $400, groceries $600, insurance $300, transportation $200 = $4,000/month as we calculated together. Withdrawal rules: Ally allows 6 withdrawals/month, maintain minimum $2,500 to avoid fees as mentioned. Fund growth potential: $24,000 at 4.5% APY = $25,080 after 1 year. Monthly interest earned: $90 at current balance."
+            {{
+                "title": "Step 1: Establish Emergency Fund with Ally High-Yield Savings",
+                "description": "Establish Emergency Fund (6 months expenses: $24,000) in Ally High-Yield Savings (4.5% APY). CALCULATION: Monthly expenses $4,000 × 6 months = $24,000 fund. This covers unemployment, medical emergencies, car repairs, home repairs based on our conversation. Step 1: Go to ally.com within 3 days, complete application using SSN and government ID as discussed. Step 2: Transfer $24,000 from Bank of America checking (30% of your $80,000 total balance). Step 3: Set up monthly auto-deposit of $200 to grow fund to $30,000 target we discussed. Step 4: Download Ally Bank app, enable balance alerts at $20,000 and $30,000. Expected completion: 1 week. ACCORDION_DETAILS: Fund allocation strategy: 100% liquid savings, no investments as recommended in our chat. Can cover 6 months of living expenses including rent/mortgage $2,500, utilities $400, groceries $600, insurance $300, transportation $200 = $4,000/month as we calculated together. Withdrawal rules: Ally allows 6 withdrawals/month, maintain minimum $2,500 to avoid fees as mentioned. Fund growth potential: $24,000 at 4.5% APY = $25,080 after 1 year. Monthly interest earned: $90 at current balance.",
+                "target_date": "2024-02-15",
+                "products": [
+                    {{
+                        "type": "savings_account",
+                        "name": "Ally Bank High-Yield Savings Account",
+                        "amount": 24000,
+                        "percentage": "4.5"
+                    }},
+                    {{
+                        "type": "bank_account",
+                        "name": "Bank of America Checking Account",
+                        "amount": 80000,
+                        "percentage": null
+                    }},
+                    {{
+                        "type": "etf",
+                        "name": "ARK Innovation ETF (ARKK)",
+                        "amount": 504447,
+                        "percentage": "30"
+                    }},
+                    {{
+                        "type": "etf",
+                        "name": "iShares Exponential Technologies ETF (XT)",
+                        "amount": 504447,
+                        "percentage": null
+                    }},
+                    {{
+                        "type": "bond",
+                        "name": "iShares iBoxx High Yield Corporate Bond ETF (HYG)",
+                        "amount": 336298,
+                        "percentage": "20"
+                    }},
+                    {{
+                        "type": "bank_account",
+                        "name": "Fidelity Brokerage Account",
+                        "amount": 1681489,
+                        "percentage": null
+                    }}
+                ]
+            }}
+
+            PRODUCT TYPES TO USE:
+            - savings_account: For high-yield savings, money market, CDs
+            - investment_fund: For mutual funds, index funds
+            - etf: For exchange-traded funds like VOO, FXAIX, ARKK, XT, HYG (INCLUDE TICKER SYMBOLS)
+            - stock: For individual stocks (INCLUDE COMPANY NAME AND TICKER SYMBOL)
+            - bond: For government bonds, corporate bonds, bond ETFs
+            - bank_account: For checking, savings accounts at traditional banks (INCLUDE BANK NAME: Fidelity, Charles Schwab, Ally Bank)
+            - credit_card: For credit card products (INCLUDE CARD ISSUER)
+            - loan: For personal loans, mortgages, auto loans
+            - other: For any other financial products
+
+            CRITICAL: ALWAYS use the EXACT product name mentioned in conversation including:
+            - ETF names with ticker symbols: "ARK Innovation ETF (ARKK)", "iShares Exponential Technologies ETF (XT)"
+            - Company names: "Fidelity", "Charles Schwab", "Vanguard", "Ally Bank"
+            - Full product names, NEVER generic terms
 
             IMPORTANT: Always respond with valid JSON. Create the MOST comprehensive and actionable todo list possible by breaking down ALL conversation advice into specific, numbered steps with exact amounts and percentages.
             """

@@ -4,6 +4,7 @@ from rest_framework.decorators import api_view, permission_classes, action
 from django.db import transaction as db_transaction
 from django.utils import timezone
 from datetime import datetime, timedelta
+from decimal import Decimal
 import logging
 import uuid
 
@@ -420,7 +421,7 @@ def ai_create_goal(request):
                                 milestone=milestone,
                                 type=product_data.get('type'),
                                 name=product_data['name'],
-                                amount=product_data['amount'].replace('$', '').replace(',', '') if product_data.get('amount') else None,
+                                amount=Decimal(str(product_data['amount'])) if product_data.get('amount') else None,
                                 percentage=product_data['percentage']
                             )
 

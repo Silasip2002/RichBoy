@@ -7,7 +7,7 @@ services:
       POSTGRES_DB: richboy_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      GEMINI_API_KEY: "AIzaSyBfLK6X5VyI9mQWEuJi271cXkyAFF0cme8"
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -40,7 +40,7 @@ services:
       - DEBUG=True
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/richboy_db
       - REDIS_URL=redis://redis:6379/0
-      - GEMINI_API_KEY=AIzaSyBfLK6X5VyI9mQWEuJi271cXkyAFF0cme8
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     volumes:
       - ./backend:/app
     ports:
