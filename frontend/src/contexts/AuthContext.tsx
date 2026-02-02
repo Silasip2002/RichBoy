@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
+
+import { getUserProfile } from '../services/api';
 
 interface User {
     id: number;
@@ -10,7 +12,7 @@ interface User {
 interface AuthContextType {
     user: User | null;
     token: string | null;
-        login: (token: string) => Promise<void>;
+    login: (token: string) => Promise<void>;
     logout: () => void;
     loading: boolean;
 }
@@ -23,6 +25,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
+    const logout = useCallback(() => {
+        localStorage.removeItem('token');
+        setUser(null);
+        setToken(null);
+        router.push('/login');
+    }, [router]);
+
+    const fetchUserProfile = useCallback(async (token: string) => {
+        try {
+            const data = await getUserProfile(token);
+            setUser(data.user);
+        } catch (error) {
+            console.error('Failed to fetch user profile', error);
+            logout();
+        } finally {
+            setLoading(false);
+        }
+    }, [logout]);
+
     useEffect(() => {
         const storedToken = localStorage.getItem('token');
         if (storedToken) {
@@ -31,42 +52,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
             setLoading(false);
         }
-    }, []);
+    }, [fetchUserProfile]);
 
-    const fetchUserProfile = async (token: string) => {
-        try {
-            const response = await fetch('http://localhost:8000/api/users/profile/', {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                },
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setUser(data.user);
-            } else {
-                logout();
-            }
-        } catch (error) {
-            console.error('Failed to fetch user profile', error);
-            logout();
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const login = async (newToken: string) => {
+    const login = useCallback(async (newToken: string) => {
         localStorage.setItem('token', newToken);
         setToken(newToken);
         await fetchUserProfile(newToken);
         router.push('/');
-    };
-
-    const logout = () => {
-        localStorage.removeItem('token');
-        setUser(null);
-        setToken(null);
-        router.push('/login');
-    };
+    }, [fetchUserProfile, router]);
 
     return (
         <AuthContext.Provider value={{ user, token, login, logout, loading }}>

@@ -1,17 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import {
-  Box,
   Button,
   Card,
   CardContent,
-  FormControl,
   FormControlLabel,
-  Grid,
   MenuItem,
-  Radio,
-  RadioGroup,
-  Select,
   Switch,
   TextField,
   Typography,
@@ -28,16 +22,16 @@ import {
   AddCircleOutline,
   RemoveCircleOutline,
   AttachMoney,
-  AccountBalanceWalletOutlined,
   DescriptionOutlined,
-  LocalOfferOutlined,
   CalendarTodayOutlined,
+  Repeat,
 } from '@mui/icons-material';
 import constants from '../data/constants.json';
 import { createTransaction, getAccounts, createAccount } from '../services/api';
 
 interface AddTransactionCardProps {
   onTransactionAdded: () => void;
+  isMobile?: boolean;
 }
 
 interface Account {
@@ -45,7 +39,7 @@ interface Account {
   name: string;
 }
 
-const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAdded }) => {
+const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAdded, isMobile = false }) => {
   const [transactionType, setTransactionType] = useState('expense');
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState(constants.currencies[0].value);
@@ -53,7 +47,8 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
   const [category, setCategory] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [isRecurring, setIsRecurring] = useState(false);
-  const [account, setAccount] = useState('');
+  const [recurringInterval, setRecurringInterval] = useState('monthly');
+  const [account, setAccount] = useState<number | string>('');
   const [accounts, setAccounts] = useState<Account[]>([]);
   const { token } = useAuth();
 
@@ -63,27 +58,26 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
   const [newAccountBalance, setNewAccountBalance] = useState('');
   const [newAccountCurrency, setNewAccountCurrency] = useState(constants.currencies[0].value);
 
-  const fetchAccounts = async () => {
-    if (!token) return;
-    try {
-      const data = await getAccounts(token);
-      if (data && Array.isArray(data.results)) {
-        setAccounts(data.results);
-      } else if (Array.isArray(data)) {
-        setAccounts(data);
-      } else {
-        console.error('Received data is not an array or paginated response');
-        setAccounts([]); // Ensure accounts is always an array
+    const fetchAccounts = useCallback(async () => {
+      if (!token) return;
+      try {
+        const data = await getAccounts(token);
+        if (data && Array.isArray(data.results)) {
+          setAccounts(data.results);
+        } else if (Array.isArray(data)) {
+          setAccounts(data);
+        } else {
+          console.error('Received data is not an array or paginated response');
+          setAccounts([]); // Ensure accounts is always an array
+        }
+      } catch (error) {
+        console.error('Error fetching accounts:', error);
       }
-    } catch (error) {
-      console.error('Error fetching accounts:', error);
-    }
-  };
-
-  useEffect(() => {
-    fetchAccounts();
-  }, [token]);
-
+    }, [token]);
+  
+    useEffect(() => {
+      fetchAccounts();
+    }, [fetchAccounts]);
   const currentCategories = transactionType === 'income' ? constants.transactionCategories.income : constants.transactionCategories.expense;
 
   const handleTransactionTypeChange = (event: React.MouseEvent<HTMLElement>, newType: string) => {
@@ -95,6 +89,34 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
 
   const handleSaveTransaction = async () => {
     if (!token) return;
+
+    // Validate required fields
+    if (!account || account === '') {
+      alert('Please select an account');
+      return;
+    }
+
+    if (!amount) {
+      alert('Please enter an amount');
+      return;
+    }
+
+    if (!description) {
+      alert('Please enter a description');
+      return;
+    }
+
+    if (!category) {
+      alert('Please select a category');
+      return;
+    }
+
+    const accountId = typeof account === 'string' ? Number(account) : account;
+    if (isNaN(accountId) || accountId <= 0) {
+      alert('Invalid account selected');
+      return;
+    }
+
     try {
       await createTransaction(token, {
         transaction_type: transactionType,
@@ -104,12 +126,22 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
         category,
         date,
         is_recurring: isRecurring,
-        account,
+        recurring_interval: isRecurring ? recurringInterval : null,
+        account: accountId,
       });
       console.log('Transaction saved');
       onTransactionAdded();
+
+      // Reset form
+      setAmount('');
+      setDescription('');
+      setCategory('');
+      setDate(new Date().toISOString().split('T')[0]);
+      setIsRecurring(false);
+      setRecurringInterval('monthly');
     } catch (error) {
       console.error('Failed to save transaction:', error);
+      alert('Failed to save transaction: ' + (error as Error).message);
     }
   };
 
@@ -144,111 +176,99 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
   return (
     <>
       <Card sx={{
-        borderRadius: '16px',
+        borderRadius: isMobile ? '12px' : '16px',
         boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
         backdropFilter: 'blur(4px)',
         WebkitBackdropFilter: 'blur(4px)',
         border: '1px solid rgba(255, 255, 255, 0.18)',
         background: 'rgba(255, 255, 255, 0.9)',
       }}>
-        <CardContent sx={{ p: 3 }}>
-          <Typography variant="h5" sx={{ fontWeight: 700, color: '#333', mb: 3, textAlign: 'center' }}>
+        <CardContent sx={{ p: isMobile ? 2 : 3 }}>
+          <Typography variant={isMobile ? "h6" : "h5"} sx={{ fontWeight: 700, color: '#333', mb: 3, textAlign: 'center' }}>
             Add New Transaction
           </Typography>
-          <Grid container spacing={3}>
-            <Grid item xs={12} width={"100%"}>
-              <ToggleButtonGroup
-                value={transactionType}
-                exclusive
-                onChange={handleTransactionTypeChange}
-                fullWidth
-                sx={{
-                  display: 'flex',
-                  gap: 2,
-                  '& .MuiToggleButton-root': {
-                    color: '#888',
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    borderRadius: '8px',
-                    border: '1px solid #ddd',
-                    '&.Mui-selected': {
-                      color: 'white',
-                      backgroundColor: transactionType === 'income' ? '#4caf50' : '#f44336',
-                      '&:hover': {
-                        backgroundColor: transactionType === 'income' ? '#43a047' : '#e53935',
-                      }
+          <div style={{"display":"flex","flexDirection":"column","gap":"1rem"}}>
+            <ToggleButtonGroup
+              value={transactionType}
+              exclusive
+              onChange={handleTransactionTypeChange}
+              fullWidth
+              sx={{
+                display: 'flex',
+                gap: 2,
+                '& .MuiToggleButton-root': {
+                  color: '#888',
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  borderRadius: '8px',
+                  border: '1px solid #ddd',
+                  '&.Mui-selected': {
+                    color: 'white',
+                    backgroundColor: transactionType === 'income' ? '#4caf50' : '#f44336',
+                    '&:hover': {
+                      backgroundColor: transactionType === 'income' ? '#43a047' : '#e53935',
                     }
                   }
-                }}
-              >
-                <ToggleButton value="expense">
-                  <RemoveCircleOutline sx={{ mr: 1 }} />
-                  Expense
-                </ToggleButton>
-                <ToggleButton value="income">
-                  <AddCircleOutline sx={{ mr: 1 }} />
-                  Income
-                </ToggleButton>
-              </ToggleButtonGroup>
-            </Grid>
-            <Grid item xs={12} width={"100%"}>
-              <TextField
-                label="Amount"
-                variant="outlined"
-                fullWidth
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <AttachMoney />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} width={"100%"}>
-              <TextField
-                select
-                label="Currency"
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                fullWidth
-              >
-                {constants.currencies.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-            <Grid item xs={12} width={"100%"}>
-              <TextField
-                label="Description"
-                variant="outlined"
-                fullWidth
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <DescriptionOutlined />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} width={"100%"}>
-              <Button onClick={handleOpenAccountDialog}
-                sx={{ minWidth: 0, px: 1, float: 'right' }}
-                size='small'
-              >+Add Account</Button>
+                }
+              }}
+            >
+              <ToggleButton value="expense">
+                <RemoveCircleOutline sx={{ mr: 1 }} />
+                Expense
+              </ToggleButton>
+              <ToggleButton value="income">
+                <AddCircleOutline sx={{ mr: 1 }} />
+                Income
+              </ToggleButton>
+            </ToggleButtonGroup>
+            <TextField
+              label="Amount"
+              variant="outlined"
+              fullWidth
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <AttachMoney />
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <TextField
+              select
+              label="Currency"
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              fullWidth
+            >
+              {constants.currencies.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              label="Description"
+              variant="outlined"
+              fullWidth
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <DescriptionOutlined />
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <div style={{ "position": "relative" }}>
               <TextField
                 select
                 label="Account"
                 value={account}
-                onChange={(e) => setAccount(e.target.value)}
+                onChange={(e) => setAccount(e.target.value === '' ? '' : Number(e.target.value))}
                 fullWidth
               >
                 <MenuItem value="" disabled>Select an account</MenuItem>
@@ -258,53 +278,63 @@ const AddTransactionCard: React.FC<AddTransactionCardProps> = ({ onTransactionAd
                   </MenuItem>
                 ))}
               </TextField>
-            </Grid>
-            <Grid item xs={12} width={"100%"}>
+              <Button onClick={handleOpenAccountDialog}
+                sx={{ minWidth: 0, px: 1, position: 'absolute', right: '35px', top: '50%', transform: 'translateY(-50%)' }}
+                size='small'
+              >+Add Account</Button>
+            </div>
+            <TextField
+              select
+              label="Category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              fullWidth
+            >
+              <MenuItem value="" disabled>Select a category</MenuItem>
+              {currentCategories.map((cat) => (
+                <MenuItem key={cat.value} value={cat.value}>
+                  {cat.label}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              label="Date"
+              variant="outlined"
+              fullWidth
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    {isRecurring ? <Repeat color="primary" /> : <CalendarTodayOutlined />}
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <FormControlLabel
+              control={<Switch checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} color="primary" />}
+              label="Recurring transaction"
+              sx={{ width: '100%' }}
+            />
+            {isRecurring && (
               <TextField
                 select
-                label="Category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                label="Recurring Interval"
+                value={recurringInterval}
+                onChange={(e) => setRecurringInterval(e.target.value)}
                 fullWidth
+                helperText="How often should this transaction repeat?"
               >
-                <MenuItem value="" disabled>Select a category</MenuItem>
-                {currentCategories.map((cat) => (
-                  <MenuItem key={cat.value} value={cat.value}>
-                    {cat.label}
-                  </MenuItem>
-                ))}
+                <MenuItem value="weekly">Weekly</MenuItem>
+                <MenuItem value="monthly">Monthly</MenuItem>
+                <MenuItem value="yearly">Yearly</MenuItem>
               </TextField>
-            </Grid>
-            <Grid item xs={12} width={"100%"}>
-              <TextField
-                label="Date"
-                variant="outlined"
-                fullWidth
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <CalendarTodayOutlined />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} width={"100%"}>
-              <FormControlLabel
-                control={<Switch checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} color="primary" />}
-                label="Recurring transaction"
-                sx={{ width: '100%' }}
-              />
-            </Grid>
-            <Grid item xs={12} width={"100%"}>
-              <Button variant="contained" color="primary" onClick={handleSaveTransaction} fullWidth sx={{ py: 1.5, textTransform: 'none', borderRadius: '8px', fontWeight: 600 }}>
-                Add Transaction
-              </Button>
-            </Grid>
-          </Grid>
+            )}
+            <Button variant="contained" color="primary" onClick={handleSaveTransaction} fullWidth sx={{ py: 1.5, textTransform: 'none', borderRadius: '8px', fontWeight: 600 }}>
+              Add Transaction
+            </Button>
+          </div>
         </CardContent>
       </Card>
       <Dialog open={openAccountDialog} onClose={handleCloseAccountDialog}>

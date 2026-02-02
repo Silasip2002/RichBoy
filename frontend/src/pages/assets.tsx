@@ -1,71 +1,57 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import AssetCard from '../components/AssetCard';
+import { getAccounts, getAssets, getAssetDetails } from '../services/api';
 import AssetList from '../components/AssetList';
 import { useAuth } from '../contexts/AuthContext';
+import { useQuery } from '@tanstack/react-query';
+
+import { Asset } from '../types/asset';
 
 const Assets: React.FC = () => {
   const { token } = useAuth();
-  const [assets, setAssets] = useState<any[]>([]);
-  const [accounts, setAccounts] = useState<any[]>([]);
+  const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const hasFetched = useRef(false);
 
+  // React Query for accounts with caching
+  const { data: accountsData } = useQuery({
+    queryKey: ['accounts'],
+    queryFn: () => getAccounts(token!),
+    enabled: !!token,
+    staleTime: 300000, // Cache for 5 minutes
+  });
+
+  const accounts = accountsData?.results || [];
+
   useEffect(() => {
-    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-
-    const fetchAccounts = async () => {
-        try {
-            const response = await fetch('http://localhost:8000/api/accounts/', {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                },
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setAccounts(data.results);
-            }
-        } catch (error) {
-            console.error('Failed to fetch accounts', error);
-        }
-    };
-
     const fetchAssets = async () => {
+        if (!token) {
+            setLoading(false);
+            return;
+        }
+        if (hasFetched.current) return;
+        hasFetched.current = true;
         setLoading(true);
+
         try {
-            const response = await fetch('http://localhost:8000/api/assets/', {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                },
-            });
-            if (response.ok) {
-                const data = await response.json();
-                const assetsWithMarketPrice = await Promise.all(data.results.map(async (asset: any) => {
-                    let market_price = asset.price; // Default to purchase price
-                    if (asset.asset_type === 'stocks' && asset.symbol) {
-                        try {
-                            const priceResponse = await fetch(`http://localhost:8000/api/get_stock_price/?symbol=${asset.symbol}`, {
-                                headers: {
-                                    'Authorization': `Bearer ${token}`,
-                                },
-                            });
-                            if (priceResponse.ok) {
-                                const priceData = await priceResponse.json();
-                                market_price = priceData.price;
-                            } else if (priceResponse.status === 404) {
-                                console.warn(`Could not find price for symbol: ${asset.symbol}`);
-                            }
-                        } catch (error) {
-                            console.error(`Failed to fetch price for ${asset.symbol}`, error);
+            const data = await getAssets(token);
+            const assetsWithMarketPrice = await Promise.all(data.results.map(async (asset: Asset) => {
+                let market_price = asset.price; // Default to purchase price
+                if ((asset.asset_type === 'stocks' || asset.asset_type === 'crypto') && asset.symbol) {
+                    try {
+                        const priceData = await getAssetDetails(token, asset.symbol, asset.asset_type);
+                        if (priceData) {
+                            market_price = priceData.price;
                         }
+                    } catch (error) {
+                        console.error(`Failed to fetch price for ${asset.symbol}`, error);
                     }
-                    return { ...asset, market_price };
-                }));
-                setAssets(assetsWithMarketPrice);
-                localStorage.setItem('cachedAssets', JSON.stringify({ assets: assetsWithMarketPrice, timestamp: Date.now() }));
-            }
+                }
+                return { ...asset, market_price };
+            }));
+            setAssets(assetsWithMarketPrice);
         } catch (error) {
             console.error('Failed to fetch assets', error);
         } finally {
@@ -73,22 +59,7 @@ const Assets: React.FC = () => {
         }
     };
 
-    if (token && !hasFetched.current) {
-        const cachedData = localStorage.getItem('cachedAssets');
-        if (cachedData) {
-            const { assets: cachedAssets, timestamp } = JSON.parse(cachedData);
-            if (Date.now() - timestamp < CACHE_DURATION) {
-                setAssets(cachedAssets);
-                setLoading(false);
-            } else {
-                fetchAssets();
-            }
-        } else {
-            fetchAssets();
-        }
-        fetchAccounts();
-        hasFetched.current = true;
-    }
+    fetchAssets();
   }, [token]);
 
   const totalAssetValue = assets.reduce((acc, asset) => acc + (asset.market_price * asset.quantity), 0).toFixed(2);
@@ -105,21 +76,26 @@ const Assets: React.FC = () => {
     value: value.toFixed(2),
   }));
 
-  const allCards = [{ title: 'Total Asset Value', value: totalAssetValue }, ...assetCards];
+  // Get the first account's currency or default to USD
+  const defaultCurrency = accounts[0]?.currency || 'USD';
+  const allCards = [
+    { title: 'Total Asset Value', value: totalAssetValue, currency: defaultCurrency },
+    ...assetCards.map(card => ({ ...card, currency: defaultCurrency }))
+  ];
 
   return (
     <div> 
       <Box sx={{ mt: 3 }}>
         <Grid container spacing={2} sx={{ mt: 3 }}>
           {allCards.map((asset, index) => (
-            <Grid item xs={12} sm={6} md={3} key={index} sx={{ display: 'flex' }}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }} key={index} sx={{ display: 'flex' }}>
               <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <AssetCard title={asset.title} value={asset.value} />
+                <AssetCard title={asset.title} value={parseFloat(asset.value)} currency={asset.currency} />
               </Box>
             </Grid>
           ))}
         </Grid>
-        <AssetList assets={assets} setAssets={setAssets} accounts={accounts} setAccounts={setAccounts} loading={loading} />
+        <AssetList assets={assets} setAssets={setAssets} accounts={accounts} loading={loading} />
       </Box>
     </div>
   );

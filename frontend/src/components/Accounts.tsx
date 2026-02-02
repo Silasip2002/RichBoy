@@ -1,9 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
+
+interface AccountsProps {
+    onDataChange?: () => void;
+}
+
 import {
     Box, Button, Card, CardContent, Typography, Grid,
     Dialog, DialogTitle, DialogContent, DialogActions,
-    TextField, MenuItem, CircularProgress, Alert, List, ListItem, ListItemText, Divider, IconButton, FormControl, Select, SelectChangeEvent
+    TextField, MenuItem, CircularProgress, Alert, List, ListItem, ListItemText, Divider, IconButton, FormControl, Select, SelectChangeEvent, Menu
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -11,14 +17,16 @@ import {
     AttachMoney as AttachMoneyIcon,
     AccountBalanceWalletOutlined as AccountBalanceWalletOutlinedIcon,
     CreditCard as CreditCardIcon,
+    MoreVert as MoreVertIcon,
+    Edit as EditIcon,
+    Delete as DeleteIcon,
     TrendingUp as TrendingUpIcon,
     MonetizationOn as MonetizationOnIcon,
-    AccountBalance as AccountBalanceIcon,
-    CreditScore as CreditScoreIcon,
+    AccountBalance as AccountBalanceIcon
 } from '@mui/icons-material';
 import { LineChart } from '@mui/x-charts/LineChart';
 import constants from '../data/constants.json';
-import { getAccounts, createAccount, getAccountDetails, getAccountTransactions, createBalanceSnapshot, getBalanceSnapshots, updateBalanceSnapshot } from '../services/api';
+import { getAccounts, createAccount, updateAccount, deleteAccount, getUserProfile, updateUserProfile, getAccountDetails, getAccountTransactions, createBalanceSnapshot, getBalanceSnapshots, updateBalanceSnapshot } from '../services/api';
 
 interface Account {
     id: number;
@@ -48,18 +56,58 @@ interface Activity {
     data: Transaction | BalanceSnapshot;
 }
 
-const Accounts: React.FC = () => {
+interface AccountsProps {
+    onDataChange?: () => void;
+}
+
+interface ApiAccount {
+    id: number;
+    name: string;
+    account_type: string;
+    balance: string;
+    currency: string;
+}
+
+interface ApiTransaction {
+    id: number;
+    date: string;
+    description: string;
+    amount: string;
+    category: string;
+}
+
+interface ApiBalanceSnapshot {
+    id: number;
+    date: string;
+    balance: string;
+    account: number;
+}
+
+interface UserProfile {
+    preferred_currency: string;
+}
+
+const Accounts: React.FC<AccountsProps> = ({ onDataChange }) => {
     const { token } = useAuth();
-    const [accounts, setAccounts] = useState<Account[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const queryClient = useQueryClient();
 
     const [openAddAccountDialog, setOpenAddAccountDialog] = useState(false);
     const [newAccountName, setNewAccountName] = useState('');
     const [newAccountType, setNewAccountType] = useState(constants.accountTypes[0].value);
     const [newAccountBalance, setNewAccountBalance] = useState('');
     const [newAccountCurrency, setNewAccountCurrency] = useState(constants.currencies[0].value);
-    const [addAccountError, setAddAccountError] = useState<string | null>(null);
+
+    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+
+    const [openEditAccountDialog, setOpenEditAccountDialog] = useState(false);
+    const [editAccountData, setEditAccountData] = useState<Partial<Account> | null>(null);
+
+    const [openDeleteConfirmDialog, setOpenDeleteConfirmDialog] = useState(false);
+
+    // State for preferred currency
+    const [preferredCurrency, setPreferredCurrency] = useState('USD');
+    const [initialPreferredCurrency, setInitialPreferredCurrency] = useState('USD'); // To check if changed
+    const [preferredCurrencyError, setPreferredCurrencyError] = useState<string | null>(null);
 
     const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
     const [activities, setActivities] = useState<Activity[]>([]);
@@ -75,29 +123,36 @@ const Accounts: React.FC = () => {
 
     const [timeFrame, setTimeFrame] = useState('all');
 
-    const fetchAccounts = async () => {
-        if (!token) return;
-        setLoading(true);
-        setError(null);
-        try {
-            const data = await getAccounts(token);
-            if (Array.isArray(data.results)) {
-                setAccounts(data.results.map((acc: any) => ({ ...acc, balance: parseFloat(acc.balance) })));
+    const { data: accounts = [], isLoading, isError, error } = useQuery<Account[], Error>({
+        queryKey: ['accounts', token],
+        queryFn: async () => {
+            if (!token) return [];
+            const data: { results: ApiAccount[] } | ApiAccount[] = await getAccounts(token);
+            if ('results' in data && Array.isArray(data.results)) {
+                return data.results.map((acc) => ({ ...acc, balance: parseFloat(acc.balance) }));
             } else if (Array.isArray(data)) {
-                setAccounts(data.map((acc: any) => ({ ...acc, balance: parseFloat(acc.balance) })));
-            } else {
-                console.error('Received data is not an array or paginated response', data);
-                setAccounts([]);
+                return data.map((acc) => ({ ...acc, balance: parseFloat(acc.balance) }));
             }
-        } catch (err: any) {
-            console.error('Error fetching accounts:', err);
-            setError(err.message || 'Network error or server is unreachable');
-        } finally {
-            setLoading(false);
-        }
-    };
+            console.error('Received data is not an array or paginated response', data);
+            return [];
+        },
+        enabled: !!token,
+    });
 
-    const fetchAccountDetailsAndActivities = async () => {
+    const { data: profile } = useQuery<UserProfile>({
+        queryKey: ['userProfile', token],
+        queryFn: () => getUserProfile(token!),
+        enabled: !!token,
+    });
+
+    useEffect(() => {
+        if (profile && profile.preferred_currency) {
+            setPreferredCurrency(profile.preferred_currency);
+            setInitialPreferredCurrency(profile.preferred_currency);
+        }
+    }, [profile]);
+
+    const fetchAccountDetailsAndActivities = React.useCallback(async () => {
         if (!token || !selectedAccount) return;
 
         setDetailsLoading(true);
@@ -108,41 +163,41 @@ const Accounts: React.FC = () => {
             setSelectedAccount({ ...accountDetails, balance: parseFloat(accountDetails.balance) });
 
             const transactionData = await getAccountTransactions(token, selectedAccount.id.toString());
-            const transactions = Array.isArray(transactionData.results) ? transactionData.results : (Array.isArray(transactionData) ? transactionData : []);
+            const transactions: ApiTransaction[] = Array.isArray(transactionData.results) ? transactionData.results : (Array.isArray(transactionData) ? transactionData : []);
 
             const snapshotData = await getBalanceSnapshots(token, selectedAccount.id.toString());
-            const snapshots = Array.isArray(snapshotData.results) ? snapshotData.results : (Array.isArray(snapshotData) ? snapshotData : []);
-            setBalanceSnapshots(snapshots.map((s: any) => ({...s, balance: parseFloat(s.balance)})));
+            const snapshots: ApiBalanceSnapshot[] = Array.isArray(snapshotData.results) ? snapshotData.results : (Array.isArray(snapshotData) ? snapshotData : []);
+            setBalanceSnapshots(snapshots.map((s) => ({...s, id: s.id, date: s.date, balance: parseFloat(s.balance)})));
 
             const combinedActivities: Activity[] = [
-                ...transactions.map((t: any) => ({ date: t.date, type: 'transaction' as const, data: { ...t, amount: parseFloat(t.amount) }})),
-                ...snapshots.map((s: any) => ({ date: s.date, type: 'snapshot' as const, data: { ...s, balance: parseFloat(s.balance) }}))
+                ...transactions.map((t) => ({ date: t.date, type: 'transaction' as const, data: { ...t, amount: parseFloat(t.amount) }})),
+                ...snapshots.map((s) => ({ date: s.date, type: 'snapshot' as const, data: { ...s, id: s.id, date: s.date, balance: parseFloat(s.balance) }}))
             ];
 
             combinedActivities.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
             setActivities(combinedActivities);
 
-        } catch (err: any) {
-            setDetailsError(err.message || 'Failed to fetch account data');
+        } catch (err: unknown) {
+            if (err instanceof Error) {
+                setDetailsError(err.message || 'Failed to fetch account data');
+            } else {
+                setDetailsError('An unknown error occurred.');
+            }
         } finally {
             setDetailsLoading(false);
         }
-    };
-
-    useEffect(() => {
-        fetchAccounts();
-    }, [token]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [token, selectedAccount?.id]);
 
     useEffect(() => {
         if (openDetailsDialog) {
             fetchAccountDetailsAndActivities();
         }
-    }, [selectedAccount?.id, openDetailsDialog, token]);
+    }, [openDetailsDialog, fetchAccountDetailsAndActivities]);
 
     const handleOpenAddAccountDialog = () => {
         setOpenAddAccountDialog(true);
-        setAddAccountError(null);
     };
 
     const handleCloseAddAccountDialog = () => {
@@ -151,27 +206,115 @@ const Accounts: React.FC = () => {
         setNewAccountType(constants.accountTypes[0].value);
         setNewAccountBalance('');
         setNewAccountCurrency(constants.currencies[0].value);
-        setAddAccountError(null);
     };
 
-    const handleCreateAccount = async () => {
-        if (!token) return;
-        setAddAccountError(null);
-        try {
-            await createAccount(token, {
-                name: newAccountName,
-                account_type: newAccountType,
-                balance: parseFloat(newAccountBalance),
-                currency: newAccountCurrency,
-            });
+    const createAccountMutation = useMutation({
+        mutationFn: (newAccount: { name: string; account_type: string; balance: number; currency: string; }) => createAccount(token!, newAccount),
+        onSuccess: (newAccount) => {
+            if (newAccount && newAccount.id) {
+                createBalanceSnapshot(token!, {
+                    account: newAccount.id,
+                    balance: parseFloat(newAccountBalance),
+                    date: new Date().toISOString().split('T')[0],
+                });
+            }
+            queryClient.invalidateQueries({ queryKey: ['accounts'] });
+            if (onDataChange) onDataChange();
             handleCloseAddAccountDialog();
-            fetchAccounts(); // Refresh accounts list
-        } catch (err: any) {
-            setAddAccountError(err.message || 'Failed to create account');
-            console.error('Error creating account:', err);
+        },
+    });
+
+    const handleCreateAccount = () => {
+        createAccountMutation.mutate({
+            name: newAccountName,
+            account_type: newAccountType,
+            balance: parseFloat(newAccountBalance),
+            currency: newAccountCurrency,
+        });
+    };
+
+    const handleMenuClick = (event: React.MouseEvent<HTMLElement>, account: Account) => {
+        event.stopPropagation();
+        setAnchorEl(event.currentTarget);
+        setSelectedAccount(account);
+    };
+
+    const handleMenuClose = () => {
+        setAnchorEl(null);
+        setSelectedAccount(null);
+    };
+
+    const handleOpenEditDialog = () => {
+        if (selectedAccount) {
+            setEditAccountData({ ...selectedAccount });
+            setOpenEditAccountDialog(true);
+        }
+        handleMenuClose();
+    };
+
+    const handleCloseEditDialog = () => {
+        setOpenEditAccountDialog(false);
+        setEditAccountData(null);
+    };
+
+    const updateAccountMutation = useMutation({
+        mutationFn: (updatedAccount: Partial<Account>) => updateAccount(token!, updatedAccount.id!, updatedAccount),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['accounts'] });
+            if (onDataChange) onDataChange();
+            handleCloseEditDialog();
+        },
+    });
+
+    const handleUpdateAccount = () => {
+        if (!editAccountData) return;
+        updateAccountMutation.mutate(editAccountData);
+    };
+
+    const handleOpenDeleteDialog = () => {
+        setOpenDeleteConfirmDialog(true);
+    };
+
+    const handleCloseDeleteDialog = () => {
+        setOpenDeleteConfirmDialog(false);
+        handleMenuClose();
+    };
+
+    const deleteAccountMutation = useMutation({
+        mutationFn: (accountId: number) => deleteAccount(token!, accountId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['accounts'] });
+            if (onDataChange) onDataChange();
+            handleCloseDeleteDialog();
+        },
+    });
+
+    const handleDeleteAccount = () => {
+        if (!selectedAccount) return;
+        deleteAccountMutation.mutate(selectedAccount.id);
+    };
+
+    const handleSavePreferredCurrency = async () => {
+        if (!token) return;
+        setPreferredCurrencyError(null);
+        try {
+            await updateUserProfile(token, { preferred_currency: preferredCurrency });
+            setInitialPreferredCurrency(preferredCurrency); // Update initial to reflect saved state
+            alert('Preferred currency updated successfully!');
+
+            // Trigger data refresh to update all currency-converted values
+            if (onDataChange) {
+                onDataChange();
+            }
+        } catch (err: unknown) {
+            if (err instanceof Error) {
+                setPreferredCurrencyError(err.message || 'Failed to update preferred currency');
+            } else {
+                setPreferredCurrencyError('An unknown error occurred.');
+            }
+            console.error('Error updating preferred currency:', err);
         }
     };
-
     const handleCardClick = (account: Account) => {
         setSelectedAccount(account);
         setOpenDetailsDialog(true);
@@ -208,10 +351,16 @@ const Accounts: React.FC = () => {
             setOpenRecordBalanceDialog(false);
             setRecordBalanceAmount('');
             // Refresh data
-            fetchAccounts();
+            if (onDataChange) {
+                onDataChange();
+            }
             fetchAccountDetailsAndActivities();
-        } catch (err: any) {
-            setRecordBalanceError(err.message || 'Failed to record balance');
+        } catch (err: unknown) {
+            if (err instanceof Error) {
+                setRecordBalanceError(err.message || 'Failed to record balance');
+            } else {
+                setRecordBalanceError('An unknown error occurred.');
+            }
         }
     };
 
@@ -243,7 +392,7 @@ const Accounts: React.FC = () => {
         return snapshotDate >= fromDate;
     });
 
-    if (loading) {
+    if (isLoading) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
                 <CircularProgress />
@@ -251,10 +400,10 @@ const Accounts: React.FC = () => {
         );
     }
 
-    if (error) {
+    if (isError) {
         return (
             <Box sx={{ my: 3 }}>
-                <Alert severity="error">{error}</Alert>
+                <Alert severity="error">{error.message}</Alert>
             </Box>
         );
     }
@@ -281,30 +430,69 @@ const Accounts: React.FC = () => {
                             Add Account
                         </Button>
                     </Box>
+
+                    {/* Preferred Currency Setting */}
+                    <Box sx={{ mb: 3, p: 2, border: '1px solid #ddd', borderRadius: '8px', bgcolor: '#f9f9f9' }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 'medium', mb: 1 }}>Display Currency</Typography>
+                        {preferredCurrencyError && <Alert severity="error" sx={{ mb: 2 }}>{preferredCurrencyError}</Alert>}
+                        <TextField
+                            select
+                            label="Preferred Display Currency"
+                            fullWidth
+                            value={preferredCurrency}
+                            onChange={(e) => setPreferredCurrency(e.target.value)}
+                            sx={{ mb: 1 }}
+                        >
+                            {constants.currencies.map((option) => (
+                                <MenuItem key={option.value} value={option.value}>
+                                    {option.label}
+                                </MenuItem>
+                            ))}
+                        </TextField>
+                        <Button
+                            variant="contained"
+                            onClick={handleSavePreferredCurrency}
+                            disabled={preferredCurrency === initialPreferredCurrency} // Disable if no change
+                            sx={{ textTransform: 'none', borderRadius: '8px' }}
+                        >
+                            Save Display Currency
+                        </Button>
+                    </Box>
+
                     <Grid container spacing={2}>
-                        {accounts.length === 0 ? (
-                            <Grid item xs={12}>
+                        {accounts.length === 0 && (
+                            <Grid size={{ xs: 12 }}>
                                 <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center', mt: 2 }}>
-                                    No accounts found. Click "Add Account" to create one.
+                                    No accounts found. Click &quot;Add Account&quot; to create one.
                                 </Typography>
                             </Grid>
-                        ) : (
-                            accounts.map((account) => (
-                                <Grid item xs={12} sm={6} md={4} key={account.id}>
-                                    <Card
-                                        onClick={() => handleCardClick(account)}
-                                        sx={{
-                                            p: 2,
-                                            borderRadius: '8px',
-                                            border: account.account_type === 'cash' ? '1px solid #a7d9b5' : account.account_type === 'bank' ? '1px solid #a2d2ff' : account.account_type === 'credit_card' ? '1px solid #d8b2ff' : account.account_type === 'investment' ? '1px solid #ffc107' : account.account_type === 'crypto' ? '1px solid #fd7e14' : account.account_type === 'bond' ? '1px solid #6610f2' : '1px solid #20c997',
-                                            bgcolor: account.account_type === 'cash' ? '#e6ffe6' : account.account_type === 'bank' ? '#e0f2ff' : account.account_type === 'credit_card' ? '#f5e6ff' : account.account_type === 'investment' ? '#fff8e1' : account.account_type === 'crypto' ? '#fff3e0' : account.account_type === 'bond' ? '#f1e6ff' : '#e6fff9',
-                                            cursor: 'pointer',
-                                            '&:hover': {
-                                                boxShadow: '0 4px 20px 0 rgba(0, 0, 0, 0.1)',
-                                                transform: 'scale(1.02)'
-                                            },
-                                            transition: 'box-shadow 0.3s ease, transform 0.3s ease'
-                                        }}>
+                        )}
+                        {accounts.map((account) => (
+                            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={account.id}>
+                                <Card
+                                    onClick={() => handleCardClick(account)}
+                                    sx={{
+                                        p: 2,
+                                        borderRadius: '8px',
+                                        border: account.account_type === 'cash' ? '1px solid #a7d9b5' : account.account_type === 'bank' ? '1px solid #a2d2ff' : account.account_type === 'credit_card' ? '1px solid #d8b2ff' : account.account_type === 'investment' ? '1px solid #ffc107' : account.account_type === 'crypto' ? '1px solid #fd7e14' : account.account_type === 'bond' ? '1px solid #6610f2' : '1px solid #20c997',
+                                        bgcolor: account.account_type === 'cash' ? '#e6ffe6' : account.account_type === 'bank' ? '#e0f2ff' : account.account_type === 'credit_card' ? '#f5e6ff' : account.account_type === 'investment' ? '#fff8e1' : account.account_type === 'crypto' ? '#fff3e0' : account.account_type === 'bond' ? '#f1e6ff' : '#e6fff9',
+                                        cursor: 'pointer',
+                                        '&:hover': {
+                                            boxShadow: '0 4px 20px 0 rgba(0, 0, 0, 0.1)',
+                                            transform: 'scale(1.02)'
+                                        },
+                                        transition: 'box-shadow 0.3s ease, transform 0.3s ease',
+                                        position: 'relative',
+                                    }}>
+                                    <CardContent>
+                                        <Box sx={{ position: 'absolute', top: 0, right: 0 }}>
+                                            <IconButton
+                                                aria-label="more"
+                                                onClick={(e) => handleMenuClick(e, account)}
+                                            >
+                                                <MoreVertIcon />
+                                            </IconButton>
+                                        </Box>
                                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                                             {account.account_type === 'cash' && (
                                                 <AttachMoneyIcon sx={{ color: '#28a745', mr: 1 }} />
@@ -325,7 +513,7 @@ const Accounts: React.FC = () => {
                                                 <AccountBalanceIcon sx={{ color: '#6610f2', mr: 1 }} />
                                             )}
                                             {account.account_type === 'loan' && (
-                                                <CreditScoreIcon sx={{ color: '#20c997', mr: 1 }} />
+                                                <CreditCardIcon sx={{ color: '#20c997', mr: 1 }} />
                                             )}
                                             <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>{account.name}</Typography>
                                         </Box>
@@ -336,24 +524,39 @@ const Accounts: React.FC = () => {
                                                 color: account.balance >= 0 ? '#28a745' : '#dc3545',
                                             }}
                                         >
-                                            {account.currency} {account.balance.toFixed(2)}
+                                            {account.currency} {account.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 } )}
                                         </Typography>
                                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                                             {constants.accountTypes.find(at => at.value === account.account_type)?.label || account.account_type}
                                         </Typography>
-                                    </Card>
-                                </Grid>
-                            ))
-                        )}
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                        ))}
                     </Grid>
                 </CardContent>
             </Card>
+
+            <Menu
+                anchorEl={anchorEl}
+                open={Boolean(anchorEl)}
+                onClose={handleMenuClose}
+            >
+                <MenuItem onClick={handleOpenEditDialog}>
+                    <EditIcon sx={{ mr: 1 }} />
+                    Edit
+                </MenuItem>
+                <MenuItem onClick={handleOpenDeleteDialog}>
+                    <DeleteIcon sx={{ mr: 1, color: 'error.main' }} />
+                    <Typography color="error">Delete</Typography>
+                </MenuItem>
+            </Menu>
 
             {/* Add Account Dialog */}
             <Dialog open={openAddAccountDialog} onClose={handleCloseAddAccountDialog}>
                 <DialogTitle>Add New Account</DialogTitle>
                 <DialogContent>
-                    {addAccountError && <Alert severity="error" sx={{ mb: 2 }}>{addAccountError}</Alert>}
+                    {createAccountMutation.isError && <Alert severity="error" sx={{ mb: 2 }}>{createAccountMutation.error.message}</Alert>}
                     <TextField
                         autoFocus
                         margin="dense"
@@ -406,10 +609,92 @@ const Accounts: React.FC = () => {
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={handleCloseAddAccountDialog}>Cancel</Button>
-                    <Button onClick={handleCreateAccount}>Create</Button>
+                    <Button onClick={handleCreateAccount} disabled={createAccountMutation.isPending}>
+                        {createAccountMutation.isPending ? <CircularProgress size={24} /> : 'Create'}
+                    </Button>
                 </DialogActions>
             </Dialog>
 
+            {/* Edit Account Dialog */}
+            <Dialog open={openEditAccountDialog} onClose={handleCloseEditDialog}>
+                <DialogTitle>Edit Account</DialogTitle>
+                <DialogContent>
+                    {updateAccountMutation.isError && <Alert severity="error" sx={{ mb: 2 }}>{updateAccountMutation.error.message}</Alert>}
+                    <TextField
+                        autoFocus
+                        margin="dense"
+                        label="Account Name"
+                        type="text"
+                        fullWidth
+                        value={editAccountData?.name || ''}
+                        onChange={(e) => setEditAccountData(prev => prev ? { ...prev, name: e.target.value } : null)}
+                        sx={{ mb: 2 }}
+                    />
+                    <TextField
+                        select
+                        margin="dense"
+                        label="Account Type"
+                        fullWidth
+                        value={editAccountData?.account_type || ''}
+                        onChange={(e) => setEditAccountData(prev => prev ? { ...prev, account_type: e.target.value } : null)}
+                        sx={{ mb: 2 }}
+                    >
+                        {constants.accountTypes.map((option) => (
+                            <MenuItem key={option.value} value={option.value}>
+                                {option.label}
+                            </MenuItem>
+                        ))}
+                    </TextField>
+                    <TextField
+                        select
+                        margin="dense"
+                        label="Currency"
+                        fullWidth
+                        value={editAccountData?.currency || ''}
+                        onChange={(e) => setEditAccountData(prev => prev ? { ...prev, currency: e.target.value } : null)}
+                        sx={{ mb: 2 }}
+                    >
+                        {constants.currencies.map((option) => (
+                            <MenuItem key={option.value} value={option.value}>
+                                {option.label}
+                            </MenuItem>
+                        ))}
+                    </TextField>
+                    <TextField
+                        margin="dense"
+                        label="Balance"
+                        type="number"
+                        fullWidth
+                        value={editAccountData?.balance ?? ''}
+                        onChange={(e) => setEditAccountData(prev => prev ? { ...prev, balance: parseFloat(e.target.value) } : null)}
+                        sx={{ mb: 2 }}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseEditDialog}>Cancel</Button>
+                    <Button onClick={handleUpdateAccount} disabled={updateAccountMutation.isPending}>
+                        {updateAccountMutation.isPending ? <CircularProgress size={24} /> : 'Save'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog
+                open={openDeleteConfirmDialog}
+                onClose={handleCloseDeleteDialog}
+            >
+                <DialogTitle>Confirm Deletion</DialogTitle>
+                <DialogContent>
+                    <Typography>Are you sure you want to delete the account &quot;{selectedAccount?.name}&quot;? This action cannot be undone.</Typography>
+                    {deleteAccountMutation.isError && <Alert severity="error" sx={{ mt: 2 }}>{deleteAccountMutation.error.message}</Alert>}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseDeleteDialog}>Cancel</Button>
+                    <Button onClick={handleDeleteAccount} color="error" disabled={deleteAccountMutation.isPending}>
+                        {deleteAccountMutation.isPending ? <CircularProgress size={24} /> : 'Delete'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
             {/* Account Details Dialog */}
             <Dialog open={openDetailsDialog} onClose={handleCloseDetailsDialog} fullWidth maxWidth="md">
                 {selectedAccount && (
@@ -430,7 +715,7 @@ const Accounts: React.FC = () => {
                                     <Card sx={{ mb: 3, borderRadius: '16px', boxShadow: 1 }}>
                                         <CardContent sx={{ p: 3 }}>
                                             <Grid container spacing={2} alignItems="center">
-                                                <Grid item xs={12} sm={6}>
+                                                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                                                     <Typography variant="h6">Balance: {selectedAccount.currency} {selectedAccount.balance.toFixed(2)}</Typography>
                                                     <Typography variant="body1" color="text.secondary">Account Type: {constants.accountTypes.find(at => at.value === selectedAccount.account_type)?.label || selectedAccount.account_type}</Typography>
                                                 </Grid>
@@ -462,13 +747,32 @@ const Accounts: React.FC = () => {
                                                             {
                                                                 dataKey: 'balance',
                                                                 label: 'Balance',
-                                                                valueFormatter: (value) => `${selectedAccount?.currency} ${value.toFixed(2)}`,
+                                                                valueFormatter: (value) => `${selectedAccount?.currency ?? ''} ${value?.toFixed ? value.toFixed(2) : ''}`,
                                                             },
                                                         ]}
                                                         xAxis={[{
                                                             scaleType: 'time',
                                                             dataKey: 'date',
                                                             valueFormatter: (date) => new Date(date).toLocaleDateString(),
+                                                        }]}
+                                                        yAxis={[{
+                                                            valueFormatter: (value: number | null) => {
+                                                                if (value == null) return '';
+                                                                const currency = selectedAccount?.currency ?? '';
+                                                                const absValue = Math.abs(value);
+                                                                let formatted = '';
+                                                                if (absValue >= 1e9) {
+                                                                    formatted = `${currency}${(value / 1e9).toFixed(1)}B`;
+                                                                } else if (absValue >= 1e6) {
+                                                                    formatted = `${currency}${(value / 1e6).toFixed(1)}M`;
+                                                                } else if (absValue >= 1e3) {
+                                                                    formatted = `${currency}${(value / 1e3).toFixed(1)}K`;
+                                                                } else {
+                                                                    formatted = `${currency}${value.toFixed(2)}`;
+                                                                }
+                                                                return formatted;
+                                                            },
+                                                            width: 120,
                                                         }]}
                                                     />
                                                 </Box>
@@ -485,7 +789,7 @@ const Accounts: React.FC = () => {
                                             <List>
                                                 {activities.length > 0 ? (
                                                     activities.map((activity, index) => (
-                                                        <React.Fragment key={`${activity.type}-${(activity.data as any).id}`}>
+                                                        <React.Fragment key={`${activity.type}-${(activity.data as Transaction | BalanceSnapshot).id}`}>
                                                             <ListItem sx={{ py: 1.5 }}>
                                                                 {activity.type === 'transaction' ? (
                                                                     <>
@@ -504,7 +808,7 @@ const Accounts: React.FC = () => {
                                                                             secondary={`Date: ${new Date(activity.data.date).toLocaleDateString()}`}
                                                                         />
                                                                         <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
-                                                                            {selectedAccount.currency} {(activity.data as BalanceSnapshot).balance.toFixed(2)}
+                                                                            {selectedAccount.currency} {(activity.data as BalanceSnapshot).balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }   )}
                                                                         </Typography>
                                                                     </>
                                                                 )}

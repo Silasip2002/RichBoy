@@ -6,4 +6,9 @@ djangorestframework
 django-cors-headers
 djangorestframework-simplejwt
 requests
+yfinance
+yahoofinancials
 django-extensions
+Pillow
+google-generativeai
+python-dotenv

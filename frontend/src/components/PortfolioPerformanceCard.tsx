@@ -1,32 +1,158 @@
-import React, { useState } from 'react';
-import { Card, CardContent, Typography, Box, Divider, Button, ButtonGroup } from '@mui/material';
-import { LineChart, PieChart } from '@mui/x-charts';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent, Typography, Box, Divider, Button, CircularProgress, Alert } from '@mui/material';
+import { PieChart } from '@mui/x-charts';
+import { Refresh as RefreshIcon } from '@mui/icons-material';
+import { useAuth } from '../contexts/AuthContext';
+import { getAssetAllocation, getAICoachAdvice } from '../services/api';
 
-type Timeframe = '1M' | '3M' | '6M' | 'YTD' | '1Y' | 'All';
+interface AssetAllocationData {
+  id: number;
+  value: number;
+  label: string;
+}
+
+interface AICoachData {
+  advice: string;
+  financial_summary: {
+    total_balance: number;
+    total_spent_last_30_days: number;
+    total_asset_value: number;
+  };
+}
 
 const PortfolioPerformanceCard: React.FC = () => {
-  const [selectedTimeframe, setSelectedTimeframe] = useState<Timeframe>('1Y'); // Default to 1 Year
+  const { token } = useAuth();
+  const [assetAllocation, setAssetAllocation] = useState<AssetAllocationData[]>([]);
+  const [aiCoachData, setAiCoachData] = useState<AICoachData | null>(null);
+  const [isLoadingAdvice, setIsLoadingAdvice] = useState(false);
+  const [adviceError, setAdviceError] = useState<string | null>(null);
+  const [displayedAdvice, setDisplayedAdvice] = useState<string>('');
+  const [isTyping, setIsTyping] = useState(false);
 
-  const timeframes: Timeframe[] = ['1M', '3M', '6M', 'YTD', '1Y', 'All'];
+  const CACHE_KEY = 'ai_coach_advice_cache';
+  const CACHE_TIMESTAMP_KEY = 'ai_coach_advice_timestamp';
+  const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
-  // Mock data for Line Chart
-  const lineChartData: { [key in Timeframe]: { series: { data: number[] }[], xAxis: { scaleType: 'point', data: string[] }[] } } = {
-    '1M': { series: [{ data: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] }], xAxis: [{ scaleType: 'point', data: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'] }] },
-    '3M': { series: [{ data: [10, 20, 15, 25, 22, 30, 28, 35, 32, 40] }], xAxis: [{ scaleType: 'point', data: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6', 'Week 7', 'Week 8', 'Week 9', 'Week 10'] }] },
-    '6M': { series: [{ data: [50, 45, 60, 55, 70, 65, 80, 75, 90, 85] }], xAxis: [{ scaleType: 'point', data: ['Month 1', 'Month 2', 'Month 3', 'Month 4', 'Month 5', 'Month 6', 'Month 7', 'Month 8', 'Month 9', 'Month 10'] }] },
-    'YTD': { series: [{ data: [100, 110, 105, 120, 115, 130, 125, 140, 135, 150] }], xAxis: [{ scaleType: 'point', data: ['Q1', 'Q2', 'Q3', 'Q4', 'Q1', 'Q2', 'Q3', 'Q4', 'Q1', 'Q2'] }] },
-    '1Y': { series: [{ data: [200, 210, 205, 220, 215, 230, 225, 240, 235, 250] }], xAxis: [{ scaleType: 'point', data: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'] }] },
-    'All': { series: [{ data: [300, 310, 305, 320, 315, 330, 325, 340, 335, 350] }], xAxis: [{ scaleType: 'point', data: ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6', 'Year 7', 'Year 8', 'Year 9', 'Year 10'] }] },
-  };
+  const getCachedAdvice = useCallback((): AICoachData | null => {
+    try {
+      const cachedData = localStorage.getItem(CACHE_KEY);
+      const cachedTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
 
-  // Mock data for Pie Chart
-  const pieChartData = [
-    { id: 0, value: 10, label: 'Stocks' },
-    { id: 1, value: 15, label: 'Bonds' },
-    { id: 2, value: 10, label: 'Real Estate' },
-    { id: 3, value: 5, label: 'Cash' },
-    { id: 4, value: 10, label: 'Crypto' },
-  ];
+      if (cachedData && cachedTimestamp) {
+        const timestamp = parseInt(cachedTimestamp, 10);
+        const now = Date.now();
+
+        if (now - timestamp < CACHE_DURATION) {
+          return JSON.parse(cachedData);
+        }
+      }
+    } catch (error) {
+      console.error('Error reading cached advice:', error);
+    }
+    return null;
+  }, []);
+
+  const setCachedAdvice = useCallback((data: AICoachData) => {
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+      localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+    } catch (error) {
+      console.error('Error caching advice:', error);
+    }
+  }, []);
+
+  const isCacheExpired = useCallback((): boolean => {
+    try {
+      const cachedTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
+      if (cachedTimestamp) {
+        const timestamp = parseInt(cachedTimestamp, 10);
+        const now = Date.now();
+        return now - timestamp >= CACHE_DURATION;
+      }
+    } catch (error) {
+      console.error('Error checking cache expiration:', error);
+    }
+    return true;
+  }, []);
+
+  const typeAdvice = useCallback((text: string) => {
+    setDisplayedAdvice('');
+    setIsTyping(true);
+    let currentIndex = 0;
+
+    const typingInterval = setInterval(() => {
+      if (currentIndex < text.length) {
+        setDisplayedAdvice(text.slice(0, currentIndex + 1));
+        currentIndex++;
+      } else {
+        clearInterval(typingInterval);
+        setIsTyping(false);
+      }
+    }, 30);
+
+    return () => clearInterval(typingInterval);
+  }, []);
+
+  const fetchAICoachAdvice = useCallback(async (forceRefresh: boolean = false) => {
+    if (!token) return;
+    setIsLoadingAdvice(true);
+    setAdviceError(null);
+
+    try {
+      // Check cache first (unless force refresh)
+      if (!forceRefresh) {
+        const cachedAdvice = getCachedAdvice();
+        if (cachedAdvice && !isCacheExpired()) {
+          setAiCoachData(cachedAdvice);
+          typeAdvice(cachedAdvice.advice);
+          setIsLoadingAdvice(false);
+          return;
+        }
+      }
+
+      // Fetch fresh data
+      const data = await getAICoachAdvice(token);
+      setAiCoachData(data);
+      setCachedAdvice(data);
+      typeAdvice(data.advice);
+    } catch (error) {
+      console.error('Failed to fetch AI coach advice', error);
+      setAdviceError('Failed to load AI coach advice. Please try again.');
+
+      // Try to load cached data as fallback
+      const cachedAdvice = getCachedAdvice();
+      if (cachedAdvice) {
+        setAiCoachData(cachedAdvice);
+        typeAdvice(cachedAdvice.advice);
+        setAdviceError('Showing cached advice. Please refresh to get latest insights.');
+      }
+    } finally {
+      setIsLoadingAdvice(false);
+    }
+  }, [token, typeAdvice, getCachedAdvice, setCachedAdvice, isCacheExpired]);
+
+  useEffect(() => {
+    const fetchAssetAllocation = async () => {
+      if (!token) return;
+      try {
+        const data = await getAssetAllocation(token);
+        const pieChartData = Object.keys(data).map((key, index) => ({
+          id: index,
+          value: data[key],
+          label: key,
+        }));
+        setAssetAllocation(pieChartData);
+      } catch (error) {
+        console.error('Failed to fetch asset allocation', error);
+      }
+    };
+
+    fetchAssetAllocation();
+    fetchAICoachAdvice();
+    injectStyles();
+  }, [token, fetchAICoachAdvice]);
+
+
 
   return (
     <Card sx={{ minWidth: 275, mb: 3 }}>
@@ -35,75 +161,130 @@ const PortfolioPerformanceCard: React.FC = () => {
           Portfolio Performance
         </Typography>
 
-        <ButtonGroup variant="outlined" aria-label="timeframe selection" sx={{ mb: 2, gap: '8px' }}>
-
-          
-          {timeframes.map((timeframe) => (
-            <Button
-              key={timeframe}
-              onClick={() => setSelectedTimeframe(timeframe)}
-              variant={selectedTimeframe === timeframe ? 'contained' : 'outlined'}
-              sx={{
-                textTransform: 'none',
-                borderRadius: '20px', // More rounded corners
-                minWidth: '60px', // Ensure consistent width
-              }}
-            >
-              {timeframe}
-            </Button>
-          ))}
-        </ButtonGroup>
-
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', mb: 2 }}>
-          <Box sx={{ width: '33.33%' }}>
-            <Typography variant="subtitle2" color="text.secondary">Daily Change</Typography>
-            <Typography variant="h6" color="success.main">+$123.45</Typography>
-          </Box>
-          <Box sx={{ width: '33.33%' }}>
-            <Typography variant="subtitle2" color="text.secondary">Weekly Change</Typography>
-            <Typography variant="h6" color="error.main">-$567.89</Typography>
-          </Box>
-          <Box sx={{ width: '33.33%' }}>
-            <Typography variant="subtitle2" color="text.secondary">Monthly Change</Typography>
-            <Typography variant="h6" color="success.main">+$1,234.56</Typography>
-          </Box>
-        </Box>
-
         <Divider sx={{ my: 2 }} />
 
-        <Typography variant="h6" component="div" sx={{ mb: 1 }}>
-          Asset Allocation
-        </Typography>
-        <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <PieChart
-            series={[
-              {
-                data: pieChartData,
-                highlightScope: { fade: 'global', highlight: 'item' },
-                faded: { innerRadius: 30, additionalRadius: -30, color: 'gray' },
-              },
-            ]}
-            height={200}
-          />
-        </Box>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', md: 'row' },
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            gap: 4,
+            width: '100%',
+          }}
+        >
+          <Box sx={{ width: { xs: '100%', md: '70%' }, minWidth: 0 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography variant="h6" component="div">
+                AI Coach Insights
+              </Typography>
+              <Button
+                size="small"
+                startIcon={<RefreshIcon />}
+                onClick={() => fetchAICoachAdvice(true)}
+                disabled={isLoadingAdvice}
+                sx={{ textTransform: 'none' }}
+              >
+                {isLoadingAdvice ? 'Loading...' : 'Refresh'}
+              </Button>
+            </Box>
+            <Box sx={{ height: 200, overflowY: 'auto' }}>
+              {isLoadingAdvice ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                  <CircularProgress size={24} />
+                </Box>
+              ) : adviceError ? (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {adviceError}
+                </Alert>
+              ) : aiCoachData ? (
+                <Box>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      lineHeight: 1.6,
+                      whiteSpace: 'pre-line',
+                      fontSize: '0.875rem',
+                      position: 'relative'
+                    }}
+                  >
+                    {displayedAdvice}
+                    {isTyping && <span className="typing-cursor">|</span>}
+                  </Typography>
 
-        <Divider sx={{ my: 2 }} />
-
-        <Typography variant="h6" component="div" sx={{ mb: 1 }}>
-          Asset Performance
-        </Typography>
-        <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <LineChart
-            xAxis={lineChartData[selectedTimeframe].xAxis}
-            series={lineChartData[selectedTimeframe].series}
-            height={200}
-            margin={{ left: 50, right: 50, top: 20, bottom: 20 }}
-          />
+                  {aiCoachData.financial_summary && (
+                    <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #e0e0e0' }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Financial Snapshot (Last 30 days):
+                      </Typography>
+                      <Box sx={{ mt: 1 }}>
+                        <Typography variant="caption" display="block">
+                          • Total Balance: ${aiCoachData.financial_summary.total_balance.toLocaleString()}
+                        </Typography>
+                        <Typography variant="caption" display="block">
+                          • Total Spent: ${aiCoachData.financial_summary.total_spent_last_30_days.toLocaleString()}
+                        </Typography>
+                        <Typography variant="caption" display="block">
+                          • Investment Value: ${aiCoachData.financial_summary.total_asset_value.toLocaleString()}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  )}
+                </Box>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  No AI coach advice available at the moment.
+                </Typography>
+              )}
+            </Box>
+          </Box>
+          <Box sx={{ width: { xs: '100%', md: '30%' }, minWidth: 0 }}>
+            <Typography variant="h6" component="div" sx={{ mb: 1 }}>
+              Allocation
+            </Typography>
+            <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <PieChart
+                series={[
+                  {
+                    data: assetAllocation.map((entry) => ({ ...entry, label: entry.label.toUpperCase() })),
+                    highlightScope: { fade: 'global', highlight: 'item' },
+                    faded: { innerRadius: 30, additionalRadius: -30, color: 'gray' },
+                    arcLabel: (item) => `${(item.value / assetAllocation.reduce((sum, entry) => sum + entry.value, 0) * 100).toFixed(2)}%`,
+                    arcLabelMinAngle: 45,
+                  },
+                ]}
+                height={200}
+              />
+            </Box>
+          </Box>
         </Box>
 
       </CardContent>
     </Card>
   );
+};
+
+const TypingCursorStyles = `
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+  }
+
+  .typing-cursor {
+    animation: blink 1s infinite;
+    color: #1976d2;
+    font-weight: bold;
+  }
+`;
+
+const injectStyles = () => {
+  if (typeof document === 'undefined') return;
+  if (document.getElementById('typing-cursor-styles')) return;
+
+  const styleSheet = document.createElement('style');
+  styleSheet.id = 'typing-cursor-styles';
+  styleSheet.textContent = TypingCursorStyles;
+  document.head.appendChild(styleSheet);
 };
 
 export default PortfolioPerformanceCard;

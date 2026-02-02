@@ -1,33 +1,146 @@
 from rest_framework import serializers
-from .models import Transaction, Account, Asset, BalanceSnapshot
+from .models import Transaction, CURRENCY_CHOICES, Budget, Goal, Milestone, FinancialProduct
 
 class TransactionSerializer(serializers.ModelSerializer):
     user = serializers.ReadOnlyField(source='user.username')
+    currency = serializers.ChoiceField(choices=CURRENCY_CHOICES)
 
     class Meta:
         model = Transaction
         fields = '__all__'
 
-class AccountSerializer(serializers.ModelSerializer):
-    user = serializers.ReadOnlyField(source='user.username')
+    def validate_account(self, value):
+        """Check that the account belongs to the current user."""
+        if value.user != self.context['request'].user:
+            raise serializers.ValidationError("You do not have permission to access this account.")
+        return value
 
-    class Meta:
-        model = Account
-        fields = '__all__'
+    def update(self, instance, validated_data):
+        # Get the old amount and type before the update
+        old_amount = instance.amount
+        old_type = instance.transaction_type
 
-class AssetSerializer(serializers.ModelSerializer):
-    user = serializers.ReadOnlyField(source='user.username')
+        # Get the account
+        account = instance.account
 
-    class Meta:
-        model = Asset
-        fields = '__all__'
-        read_only_fields = ('market_value', 'change')
+        # Revert the old transaction's effect on the balance
+        if old_type == 'income':
+            account.balance -= old_amount
+        else: # expense
+            account.balance += old_amount
+
+        # Apply the new transaction's effect on the balance
+        new_amount = validated_data.get('amount', old_amount)
+        new_type = validated_data.get('transaction_type', old_type)
+
+        if new_type == 'income':
+            account.balance += new_amount
+        else: # expense
+            account.balance -= new_amount
+        
+        account.save()
+
+        # Save the updated transaction
+        return super().update(instance, validated_data)
 
 class CategorySerializer(serializers.Serializer):
     name = serializers.CharField(max_length=100)
 
-class BalanceSnapshotSerializer(serializers.ModelSerializer):
+class BudgetSerializer(serializers.ModelSerializer):
     user = serializers.ReadOnlyField(source='user.username')
+    spent_amount = serializers.SerializerMethodField()
+
     class Meta:
-        model = BalanceSnapshot
+        model = Budget
         fields = '__all__'
+
+    def get_spent_amount(self, obj):
+        from .models import Transaction
+        from django.db.models import Sum
+        import datetime
+
+        today = datetime.date.today()
+        if obj.period == 'Month':
+            start_date = today.replace(day=1)
+            end_date = (start_date + datetime.timedelta(days=32)).replace(day=1) - datetime.timedelta(days=1)
+        else: # Year
+            start_date = today.replace(month=1, day=1)
+            end_date = today.replace(month=12, day=31)
+
+        # Get all expense transactions for this budget category and period
+        transactions = Transaction.objects.filter(
+            user=obj.user,
+            category=obj.category,
+            transaction_type='expense',
+            date__range=[start_date, end_date]
+        )
+
+        total_spent = 0
+        from accounts.views import convert_currency
+
+        for transaction in transactions:
+            transaction_amount = transaction.amount
+            # Convert transaction amount to budget's currency if they're different
+            if transaction.currency != obj.currency:
+                converted_amount = convert_currency(transaction_amount, transaction.currency, obj.currency)
+                if converted_amount is not None:
+                    total_spent += converted_amount
+                else:
+                    # Fallback: use original amount if conversion fails
+                    total_spent += transaction_amount
+            else:
+                total_spent += transaction_amount
+
+        return total_spent
+
+
+class FinancialProductSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FinancialProduct
+        fields = ['id', 'type', 'name', 'amount', 'percentage']
+
+
+class MilestoneSerializer(serializers.ModelSerializer):
+    products = FinancialProductSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Milestone
+        fields = ['id', 'title', 'description', 'target_date', 'completed', 'status',
+                  'calculation', 'accordion_details', 'timeline', 'products',
+                  'created_at', 'updated_at']
+
+
+class GoalSerializer(serializers.ModelSerializer):
+    milestones = MilestoneSerializer(many=True, read_only=True)
+    progress_percentage = serializers.ReadOnlyField()
+
+    class Meta:
+        model = Goal
+        fields = ['id', 'title', 'description', 'target_amount', 'current_amount',
+                  'deadline', 'category', 'status', 'ai_generated', 'progress_percentage',
+                  'milestones', 'created_at', 'updated_at']
+
+
+class GoalCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating goals with milestones"""
+    milestones = MilestoneSerializer(many=True, required=False)
+
+    class Meta:
+        model = Goal
+        fields = ['id', 'title', 'description', 'target_amount', 'current_amount',
+                  'deadline', 'category', 'status', 'ai_generated', 'milestones']
+
+    def create(self, validated_data):
+        milestones_data = validated_data.pop('milestones', [])
+        goal = Goal.objects.create(**validated_data)
+
+        # Create milestones
+        for milestone_data in milestones_data:
+            products_data = milestone_data.pop('products', [])
+            milestone = Milestone.objects.create(goal=goal, **milestone_data)
+
+            # Create financial products
+            for product_data in products_data:
+                FinancialProduct.objects.create(milestone=milestone, **product_data)
+
+        return goal

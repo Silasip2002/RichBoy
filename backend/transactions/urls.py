@@ -1,24 +1,24 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
-    TransactionViewSet, 
-    AccountViewSet, 
-    AssetViewSet, 
-    get_stock_price, 
-    search_symbols,
+    TransactionViewSet,
     CategoryViewSet,
-    BalanceSnapshotViewSet
-    ) 
-    
+    BudgetViewSet,
+    GoalViewSet,
+    get_ai_coach_advice,
+    ai_goal_chat,
+    ai_create_goal
+)
+
 router = DefaultRouter()
 router.register(r'transactions', TransactionViewSet, basename='transaction')
-router.register(r'accounts', AccountViewSet, basename='account')
-router.register(r'assets', AssetViewSet, basename='asset')
 router.register(r'categories', CategoryViewSet, basename='category')
-router.register(r'balance-snapshots', BalanceSnapshotViewSet, basename='balance-snapshot')
-# Specific paths must come BEFORE the router include
+router.register(r'budgets', BudgetViewSet, basename='budget')
+router.register(r'goals', GoalViewSet, basename='goal')
+
 urlpatterns = [
-    path('get_stock_price/', get_stock_price, name='get_stock_price'),
-    path('search_symbols/', search_symbols, name='search_symbols'),
     path('', include(router.urls)),
+    path('ai-coach-advice/', get_ai_coach_advice, name='ai-coach-advice'),
+    path('ai-goal-chat/', ai_goal_chat, name='ai-goal-chat'),
+    path('ai-create-goal/', ai_create_goal, name='ai-create-goal'),
 ]

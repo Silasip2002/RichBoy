@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box, Grid, Tabs, Tab } from '@mui/material';
+import { Box, Tabs, Tab, useTheme, useMediaQuery, Typography } from '@mui/material';
 import AddTransactionCard from '../components/AddTransactionCard';
 import TransactionHistory from '../components/TransactionHistory';
 import Reports from '../components/Reports';
@@ -16,6 +16,8 @@ interface TabPanelProps {
 
 function TabPanel(props: TabPanelProps) {
     const { children, value, index, ...other } = props;
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
     return (
         <div
@@ -26,7 +28,10 @@ function TabPanel(props: TabPanelProps) {
             {...other}
         >
             {value === index && (
-                <Box sx={{ p: 2 }}>
+                <Box sx={{
+                    p: isMobile ? 1 : 2,
+                    pb: isMobile ? 8 : 2 // Extra bottom padding for mobile FAB
+                }}>
                     {children}
                 </Box>
             )}
@@ -35,6 +40,8 @@ function TabPanel(props: TabPanelProps) {
 }
 
 const TransactionsPage = () => {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
     const [value, setValue] = useState(0);
     const [transactions, setTransactions] = useState([]);
     const [count, setCount] = useState(0);
@@ -49,6 +56,8 @@ const TransactionsPage = () => {
     const [account, setAccount] = useState('all');
 
     const [accounts, setAccounts] = useState([]);
+    const [, setRefreshAccounts] = useState(0);
+    const [refreshSummary, setRefreshSummary] = useState(0);
 
     const handleChange = (event: React.SyntheticEvent, newValue: number) => {
         setValue(newValue);
@@ -74,6 +83,12 @@ const TransactionsPage = () => {
             }
         }
     }, [token, page, rowsPerPage, search, time, type, category, account]);
+
+    const handleTransactionAdded = () => {
+        fetchTransactions();
+        setRefreshAccounts(prev => prev + 1);
+        setRefreshSummary(prev => prev + 1);
+    };
 
     useEffect(() => {
         const fetchFilters = async () => {
@@ -105,49 +120,149 @@ const TransactionsPage = () => {
         setPage(0);
     };
 
+    // For mobile, we want fewer rows per page by default
+    React.useEffect(() => {
+        if (isMobile && rowsPerPage > 10) {
+            setRowsPerPage(10);
+        }
+    }, [isMobile, rowsPerPage]);
+
     return (
-        <Box sx={{ width: '100%' }}>
-            <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                <Tabs value={value} onChange={handleChange} aria-label="basic tabs example">
-                    <Tab label="Transactions" />
-                    <Tab label="Reports" />
-                    <Tab label="Accounts" />
-                    <Tab label="Budgets" />
-                </Tabs>
+        <Box sx={{
+            width: '100%',
+            minHeight: '100vh',
+            backgroundColor: theme.palette.background.default,
+            pb: isMobile ? 7 : 0 // Bottom navigation space
+        }}>
+            {/* Mobile-optimized Header */}
+            <Box sx={{
+                px: isMobile ? 2 : 3,
+                py: isMobile ? 2 : 3,
+                backgroundColor: theme.palette.background.paper,
+                borderBottom: `1px solid ${theme.palette.divider}`,
+                position: 'sticky',
+                top: 0,
+                zIndex: 1100
+            }}>
+                <Typography
+                    variant={isMobile ? "h5" : "h4"}
+                    component="h1"
+                    sx={{
+                        fontWeight: 'bold',
+                        textAlign: isMobile ? 'center' : 'left',
+                        mb: isMobile ? 2 : 3
+                    }}
+                >
+                    💰 Finance Manager
+                </Typography>
+
+                <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                    <Tabs
+                        value={value}
+                        onChange={handleChange}
+                        aria-label="finance tabs"
+                        variant={isMobile ? "fullWidth" : "standard"}
+                        scrollButtons={isMobile ? "auto" : false}
+                        allowScrollButtonsMobile
+                        sx={{
+                            '& .MuiTab-root': {
+                                minWidth: isMobile ? 'auto' : 160,
+                                fontSize: isMobile ? '0.875rem' : '0.875rem',
+                                fontWeight: 500,
+                                textTransform: 'none',
+                                py: isMobile ? 1 : 2
+                            }
+                        }}
+                    >
+                        <Tab label={isMobile ? "📝" : "Transactions"} />
+                        <Tab label={isMobile ? "📊" : "Reports"} />
+                        <Tab label={isMobile ? "🏦" : "Accounts"} />
+                        <Tab label={isMobile ? "📋" : "Budgets"} />
+                    </Tabs>
+                </Box>
             </Box>
             <TabPanel value={value} index={0}>
-                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2 }}>
-                    <Box sx={{ flexGrow: 1 }}>
-                        <TransactionHistory
-                            transactions={transactions}
-                            count={count}
-                            page={page}
-                            rowsPerPage={rowsPerPage}
-                            onPageChange={handleChangePage}
-                            onRowsPerPageChange={handleChangeRowsPerPage}
-                            search={search}
-                            setSearch={setSearch}
-                            time={time}
-                            setTime={setTime}
-                            type={type}
-                            setType={setType}
-                            category={category}
-                            setCategory={setCategory}
-                            account={account}
-                            setAccount={setAccount}
-                            accounts={accounts}
-                        />
+                {isMobile ? (
+                    // Mobile Layout: Transaction History first, then Add Transaction below
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {/* Transaction History */}
+                        <Box>
+                            <TransactionHistory
+                                transactions={transactions}
+                                count={count}
+                                page={page}
+                                rowsPerPage={rowsPerPage}
+                                onPageChange={handleChangePage}
+                                onRowsPerPageChange={handleChangeRowsPerPage}
+                                search={search}
+                                setSearch={setSearch}
+                                time={time}
+                                setTime={setTime}
+                                type={type}
+                                setType={setType}
+                                category={category}
+                                setCategory={setCategory}
+                                account={account}
+                                setAccount={setAccount}
+                                accounts={accounts}
+                                refreshSummary={refreshSummary}
+                                onRefresh={handleTransactionAdded}
+                                isMobile={isMobile}
+                            />
+                        </Box>
+
+                        {/* Add Transaction Card - below transaction history on mobile */}
+                        <Box>
+                            <AddTransactionCard
+                                onTransactionAdded={handleTransactionAdded}
+                                isMobile={isMobile}
+                            />
+                        </Box>
                     </Box>
-                    <Box sx={{ width: { xs: '100%', md: '320px' }, flexShrink: 0 }}>
-                        <AddTransactionCard onTransactionAdded={fetchTransactions} />
+                ) : (
+                    // Desktop Layout: Side-by-side layout
+                    <Box sx={{ display: 'flex', gap: 2, height: 'calc(100vh - 200px)' }}>
+                        {/* Transaction History - takes up most of the space */}
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <TransactionHistory
+                                transactions={transactions}
+                                count={count}
+                                page={page}
+                                rowsPerPage={rowsPerPage}
+                                onPageChange={handleChangePage}
+                                onRowsPerPageChange={handleChangeRowsPerPage}
+                                search={search}
+                                setSearch={setSearch}
+                                time={time}
+                                setTime={setTime}
+                                type={type}
+                                setType={setType}
+                                category={category}
+                                setCategory={setCategory}
+                                account={account}
+                                setAccount={setAccount}
+                                accounts={accounts}
+                                refreshSummary={refreshSummary}
+                                onRefresh={handleTransactionAdded}
+                                isMobile={isMobile}
+                            />
+                        </Box>
+
+                        {/* Add Transaction Card - fixed width on right side */}
+                        <Box sx={{ width: 380, flexShrink: 0 }}>
+                            <AddTransactionCard
+                                onTransactionAdded={handleTransactionAdded}
+                                isMobile={isMobile}
+                            />
+                        </Box>
                     </Box>
-                </Box>
+                )}
             </TabPanel>
             <TabPanel value={value} index={1}>
                 <Reports />
             </TabPanel>
             <TabPanel value={value} index={2}>
-                <Accounts />
+                <Accounts onDataChange={handleTransactionAdded} />
             </TabPanel>
             <TabPanel value={value} index={3}>
                 <Budgets />

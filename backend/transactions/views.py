@@ -1,14 +1,78 @@
 from rest_framework import viewsets, permissions, status
-from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-import requests
+from rest_framework.decorators import api_view, permission_classes, action
+from django.db import transaction as db_transaction
+from django.utils import timezone
+from datetime import datetime, timedelta
+from decimal import Decimal
 import logging
-from django.conf import settings
-from .models import Transaction, Account, Asset, BalanceSnapshot
-from .serializers import TransactionSerializer, AccountSerializer, AssetSerializer, CategorySerializer, BalanceSnapshotSerializer
+import uuid
+
+from .models import Transaction, Budget, Goal, Milestone, FinancialProduct
+from .serializers import (
+    TransactionSerializer, CategorySerializer, BudgetSerializer,
+    GoalSerializer, GoalCreateSerializer, MilestoneSerializer
+)
+from .ai_coach import AICoachService
+from accounts.models import Account
+from richboy_backend.pagination import StandardResultsSetPagination
 
 logger = logging.getLogger(__name__)
 
+class BudgetViewSet(viewsets.ModelViewSet):
+    serializer_class = BudgetSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
+
+    def get_queryset(self):
+        return Budget.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class GoalViewSet(viewsets.ModelViewSet):
+    serializer_class = GoalSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
+
+    def get_queryset(self):
+        return Goal.objects.filter(user=self.request.user).order_by('-created_at')
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return GoalCreateSerializer
+        return GoalSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def toggle_milestone(self, request, pk=None):
+        """Toggle milestone completion status"""
+        goal = self.get_object()
+        milestone_id = request.data.get('milestone_id')
+
+        try:
+            milestone = Milestone.objects.get(id=milestone_id, goal=goal)
+            milestone.completed = not milestone.completed
+            milestone.status = 'completed' if milestone.completed else 'in_progress'
+            milestone.save()
+
+            # Check if all milestones are completed
+            all_completed = all(m.completed for m in goal.milestones.all())
+            if all_completed:
+                goal.status = 'completed'
+                goal.current_amount = goal.target_amount
+                goal.save()
+
+            serializer = MilestoneSerializer(milestone)
+            return Response(serializer.data)
+        except Milestone.DoesNotExist:
+            return Response(
+                {'error': 'Milestone not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 class CategoryViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
@@ -18,204 +82,402 @@ class CategoryViewSet(viewsets.ViewSet):
         serializer = CategorySerializer([{'name': category} for category in queryset], many=True)
         return Response(serializer.data)
 
-
 class TransactionViewSet(viewsets.ModelViewSet):
     serializer_class = TransactionSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
+
+    def list(self, request, *args, **kwargs):
+        try:
+            return super().list(request, *args, **kwargs)
+        except Exception as e:
+            logger.exception("Error in TransactionViewSet list method:")
+            return Response({"detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def get_queryset(self):
-        return self.request.user.transactions.all()
+        user = self.request.user
+        queryset = Transaction.objects.filter(user=user).order_by('-date')
+
+        account_id = self.request.query_params.get('account')
+        if account_id and account_id != 'all':
+            queryset = queryset.filter(account__id=account_id)
+
+        category = self.request.query_params.get('category')
+        if category and category != 'all':
+            queryset = queryset.filter(category=category)
+
+        transaction_type = self.request.query_params.get('transaction_type')
+        if transaction_type and transaction_type != 'all':
+            queryset = queryset.filter(transaction_type=transaction_type)
+
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+
+        if start_date and end_date:
+            queryset = queryset.filter(date__range=[start_date, end_date])
+        elif start_date:
+            queryset = queryset.filter(date__gte=start_date)
+        elif end_date:
+            queryset = queryset.filter(date__lte=end_date)
+
+        return queryset
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
-
-class AccountViewSet(viewsets.ModelViewSet):
-    serializer_class = AccountSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_queryset(self):
-        return self.request.user.accounts.all()
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
-
-class BalanceSnapshotViewSet(viewsets.ModelViewSet):
-    serializer_class = BalanceSnapshotSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_queryset(self):
-        return self.request.user.balance_snapshots.all()
-
-    def perform_create(self, serializer):
-        snapshot = serializer.save(user=self.request.user)
-        account = snapshot.account
-        account.balance = snapshot.balance
-        account.save()
+        with db_transaction.atomic():
+            # The account is now expected to be a validated part of the serializer data
+            account = serializer.validated_data['account']
+            if account.user != self.request.user:
+                 raise permissions.PermissionDenied("You do not have permission to access this account.")
+            transaction = serializer.save(user=self.request.user)
+            self.update_account_balance(transaction)
 
     def perform_update(self, serializer):
-        snapshot = serializer.save()
-        account = snapshot.account
-        account.balance = snapshot.balance
+        with db_transaction.atomic():
+            old_transaction = Transaction.objects.get(pk=serializer.instance.pk)
+            updated_transaction = serializer.save()
+            self.revert_account_balance(old_transaction)
+            self.update_account_balance(updated_transaction)
+
+    def perform_destroy(self, instance):
+        with db_transaction.atomic():
+            self.revert_account_balance(instance)
+            instance.delete()
+
+    def update_account_balance(self, transaction):
+        account = transaction.account
+        if transaction.transaction_type == 'income':
+            account.balance += transaction.amount
+        elif transaction.transaction_type == 'expense':
+            account.balance -= transaction.amount
         account.save()
 
-class AssetViewSet(viewsets.ModelViewSet):
-    serializer_class = AssetSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    def revert_account_balance(self, transaction):
+        account = transaction.account
+        if transaction.transaction_type == 'income':
+            account.balance -= transaction.amount
+        elif transaction.transaction_type == 'expense':
+            account.balance += transaction.amount
+        account.save()
 
-    def get_queryset(self):
-        return self.request.user.assets.all().order_by('id')
-
-    def perform_create(self, serializer):
-        price_per_unit = serializer.validated_data.get('price')
-        quantity = serializer.validated_data.get('quantity')
-
-        # Recalculate cost on backend to ensure correctness
-        cost = price_per_unit * quantity
-
-        # At creation, market price is the same as purchase price
-        market_price = price_per_unit
-        market_value = market_price * quantity
-        
-        change = 0 # Change is always 0 at creation
-
-        serializer.save(
-            user=self.request.user,
-            cost=cost, # Overwrite cost
-            market_price=market_price,
-            market_value=market_value,
-            change=change
-        )
-
-    def perform_update(self, serializer):
-        instance = serializer.instance
-        price_per_unit = serializer.validated_data.get('price', instance.price)
-        quantity = serializer.validated_data.get('quantity', instance.quantity)
-        
-        cost = price_per_unit * quantity
-
-        market_price = serializer.validated_data.get('market_price', instance.market_price)
-        
-        market_value = market_price * quantity
-        if cost > 0:
-            change = ((market_value - cost) / cost) * 100
-        else:
-            change = 0
-
-        serializer.save(
-            cost=cost,
-            market_price=market_price,
-            market_value=market_value,
-            change=change
-        )
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
-def get_stock_price(request):
-    symbol = request.query_params.get('symbol', None)
-    if not symbol:
-        return Response({'error': 'Symbol parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
-
-    api_key = settings.ALPHA_VANTAGE_API_KEY
-    
-    # Fetch Price
-    price_url = f'https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey={api_key}'
-    
-    # Fetch Name
-    search_url = f'https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords={symbol}&apikey={api_key}'
-
+def get_ai_coach_advice(request):
+    """
+    Get personalized financial advice from AI coach
+    """
     try:
-        price_response = requests.get(price_url)
-        price_data = price_response.json()
-        logger.error(f"Alpha Vantage Price Response for {symbol}: {price_data}")
+        ai_coach = AICoachService()
 
-        if "Note" in price_data:
-            return Response({'error': 'Alpha Vantage API rate limit exceeded.'}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+        # Get user's financial data
+        financial_data = ai_coach.get_user_financial_data(request.user)
 
-        search_response = requests.get(search_url)
-        search_data = search_response.json()
-        logger.error(f"Alpha Vantage Search Response for {symbol}: {search_data}")
+        # Generate AI advice
+        advice = ai_coach.generate_financial_advice(financial_data)
+
+        return Response({
+            'advice': advice,
+            'financial_summary': {
+                'total_balance': financial_data.get('accounts', {}).get('total_balance', 0),
+                'total_spent_last_30_days': financial_data.get('recent_spending', {}).get('total_spent', 0),
+                'total_asset_value': financial_data.get('assets', {}).get('total_value', 0),
+            }
+        })
+
+    except ValueError as e:
+        # Handle missing API key
+        logger.error(f"AI Coach configuration error: {e}")
+        return Response({
+            'error': 'AI Coach service is not properly configured',
+            'advice': 'AI Coach is currently unavailable. Please contact support.',
+        }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    except Exception as e:
+        logger.error(f"Error generating AI coach advice: {e}")
+        return Response({
+            'error': 'Failed to generate financial advice',
+            'advice': 'I\'m having trouble providing financial advice right now. Please try again later.',
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-        price = None
-        name = None
-
-        if 'Global Quote' in price_data and '05. price' in price_data['Global Quote']:
-            price = price_data['Global Quote']['05. price']
-        
-        if 'bestMatches' in search_data and len(search_data['bestMatches']) > 0:
-            # Find the best match for the symbol
-            best_match = next((match for match in search_data['bestMatches'] if match['1. symbol'].upper() == symbol.upper()), None)
-            if best_match:
-                name = best_match['2. name']
-
-        if price is not None and name is not None:
-            return Response({'price': price, 'name': name})
-        elif price is not None:
-            return Response({'price': price, 'name': ''}) # Return price even if name not found
-        else:
-            return Response({'error': 'Could not fetch data for the given symbol'}, status=status.HTTP_404_NOT_FOUND)
-            
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Request failed for {symbol}: {e}")
-        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-@api_view(['GET'])
+@api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
-def search_symbols(request):
-    keywords = request.query_params.get('keywords', None)
-    asset_type = request.query_params.get('type', 'stocks')
+def ai_goal_chat(request):
+    """
+    Chat with AI coach about financial goals
+    """
+    try:
+        logger.info("Initializing AI Coach Service...")
+        ai_coach = AICoachService()
 
-    if not keywords:
-        return Response({'error': 'Keywords parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+        # Get message and conversation history from request
+        message = request.data.get('message', '').strip()
+        conversation_history = request.data.get('conversation_history', [])
 
-    api_key = settings.ALPHA_VANTAGE_API_KEY
+        if not message:
+            return Response({
+                'error': 'Message is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
 
-    if asset_type == 'crypto':
-        url = 'https://www.alphavantage.co/digital_currency_list/'
+        logger.info(f"Generating AI response for message: {message[:50]}...")
+
+        # Generate AI response
+        response = ai_coach.generate_goal_chat_response(
+            user=request.user,
+            message=message,
+            conversation_history=conversation_history
+        )
+
+        logger.info("AI response generated successfully")
+
+        return Response({
+            'response': response,
+            'timestamp': timezone.now().isoformat()
+        })
+
+    except ValueError as e:
+        # Handle missing API key
+        logger.error(f"AI Coach configuration error: {e}")
+        return Response({
+            'error': 'AI Coach service is not properly configured',
+            'response': 'AI Coach is currently unavailable. Please contact support.',
+        }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    except Exception as e:
+        logger.error(f"Error in AI goal chat: {e}")
+        logger.error(f"Exception type: {type(e).__name__}")
+        # Check for specific API errors
+        error_msg = str(e).lower()
+        if "api key" in error_msg or "permission" in error_msg or "401" in error_msg:
+            return Response({
+                'error': 'API authentication failed',
+                'response': 'I\'m having trouble accessing my AI capabilities due to an API configuration issue. Please check your API key setup.',
+            }, status=status.HTTP_401_UNAUTHORIZED)
+
+        return Response({
+            'error': 'Failed to generate response',
+            'response': 'I\'m having trouble responding right now. Please try again later.',
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def ai_create_goal(request):
+    """
+    Extract goal from conversation and create it automatically
+    """
+    try:
+        logger.info("AI create goal request received")
+        logger.info(f"Request data: {request.data}")
+
+        # Get conversation history from request
+        conversation_history = request.data.get('conversation_history', [])
+
+        if not conversation_history:
+            logger.error("No conversation history provided")
+            return Response({
+                'success': False,
+                'error': 'Conversation history is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        logger.info(f"AI goal creation request with {len(conversation_history)} messages")
+
+        # Try to use AI service, but fallback to simple logic if it fails
         try:
-            response = requests.get(url)
-            response.raise_for_status()
-            
-            import csv
-            import io
-            
-            results = []
-            csv_file = io.StringIO(response.text)
-            reader = csv.reader(csv_file)
-            
-            try:
-                next(reader) # Skip header row
-            except StopIteration:
-                return Response([]) # Empty file
+            ai_coach = AICoachService()
 
-            for row in reader:
-                if len(row) == 2:
-                    symbol, name = row
-                    if keywords.lower() in symbol.lower() or keywords.lower() in name.lower():
-                        results.append({'symbol': symbol, 'name': name})
-            
-            return Response(results[:100])
+            # Extract goal information from conversation
+            goal_extraction = ai_coach.extract_goal_from_conversation(
+                user=request.user,
+                conversation_history=conversation_history
+            )
 
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to fetch crypto list: {e}")
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.info(f"AI goal extraction result: {goal_extraction}")
 
-    else: # For stocks and other types
-        url = f'https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords={keywords}&apikey={api_key}'
+            # For now, return the goal data (since we don't have goal models in DB yet)
+            # In the future, this would create the goal in the database
+            goal_data = goal_extraction.get('goal_data', {})
+
+            # If AI couldn't extract a goal, create a default savings goal
+            if not goal_extraction.get('success'):
+                logger.info("AI couldn't extract goal, creating default savings goal")
+                goal_data = {
+                    'title': 'Build Emergency Fund',
+                    'description': 'Save money for unexpected expenses and financial security',
+                    'category': 'savings',
+                    'target_amount': 10000,
+                    'current_amount': 0,
+                    'deadline': (datetime.now() + timedelta(days=365)).strftime('%Y-%m-%d'),
+                    'milestones': [
+                        {
+                            'title': 'Save first $500',
+                            'description': 'Start your emergency fund with $500',
+                            'target_date': (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
+                        },
+                        {
+                            'title': 'Reach $2,500',
+                            'description': 'Build a solid foundation',
+                            'target_date': (datetime.now() + timedelta(days=90)).strftime('%Y-%m-%d')
+                        },
+                        {
+                            'title': 'Complete emergency fund',
+                            'description': 'Reach your $10,000 emergency fund goal',
+                            'target_date': (datetime.now() + timedelta(days=365)).strftime('%Y-%m-%d')
+                        }
+                    ]
+                }
+
+        except Exception as ai_error:
+            logger.error(f"AI service failed, using fallback: {ai_error}")
+            # Create a simple fallback goal
+            goal_data = {
+                'title': 'Build Financial Security',
+                'description': 'Save money and build wealth for your future',
+                'category': 'savings',
+                'target_amount': 10000,
+                'current_amount': 0,
+                'deadline': (datetime.now() + timedelta(days=365)).strftime('%Y-%m-%d'),
+                'milestones': [
+                    {
+                        'title': 'Create budget',
+                        'description': 'Track your income and expenses',
+                        'target_date': (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
+                    },
+                    {
+                        'title': 'Save first $1,000',
+                        'description': 'Build your emergency fund',
+                        'target_date': (datetime.now() + timedelta(days=60)).strftime('%Y-%m-%d')
+                    },
+                    {
+                        'title': 'Invest for growth',
+                        'description': 'Put your money to work for you',
+                        'target_date': (datetime.now() + timedelta(days=90)).strftime('%Y-%m-%d')
+                    }
+                ]
+            }
+
+        # Generate milestone IDs and dates
+        now = datetime.now()
+        for i, milestone in enumerate(goal_data.get('milestones', [])):
+            milestone['id'] = str(uuid.uuid4())
+            milestone['target_date'] = milestone.get('target_date') or (now + timedelta(days=30 * (i + 1))).strftime('%Y-%m-%d')
+            milestone['completed'] = False
+            milestone['status'] = 'completed' if i == 0 and goal_data.get('current_amount', 0) > 0 else 'upcoming' if i > 0 else 'in_progress'
+
+        # Create complete goal object
+        complete_goal = {
+            'id': str(uuid.uuid4()),
+            'title': goal_data['title'],
+            'description': goal_data['description'],
+            'target_amount': goal_data['target_amount'],
+            'current_amount': goal_data.get('current_amount', 0),
+            'deadline': goal_data.get('deadline'),
+            'category': goal_data['category'],
+            'status': 'active',
+            'milestones': goal_data.get('milestones', []),
+            'created_at': now.isoformat(),
+            'updated_at': now.isoformat(),
+            'ai_generated': True
+        }
+
+        logger.info(f"Created complete goal object: {complete_goal['title']}")
+
+        # Save the goal to the database
         try:
-            response = requests.get(url)
-            response.raise_for_status()
-            data = response.json()
+            with db_transaction.atomic():
+                # Create the goal
+                goal = Goal.objects.create(
+                    id=complete_goal['id'],
+                    user=request.user,
+                    title=complete_goal['title'],
+                    description=complete_goal['description'],
+                    target_amount=complete_goal['target_amount'],
+                    current_amount=complete_goal['current_amount'],
+                    deadline=datetime.strptime(complete_goal['deadline'], '%Y-%m-%d').date() if complete_goal.get('deadline') else None,
+                    category=complete_goal['category'],
+                    status=complete_goal['status'],
+                    ai_generated=complete_goal['ai_generated']
+                )
 
-            if "Note" in data:
-                logger.warning(f"Alpha Vantage API rate limit likely exceeded when searching for {keywords}.")
-                return Response([], status=status.HTTP_200_OK)
+                # Create milestones
+                for milestone_data in complete_goal['milestones']:
+                    milestone = Milestone.objects.create(
+                        id=milestone_data['id'],
+                        goal=goal,
+                        title=milestone_data['title'],
+                        description=milestone_data.get('description'),
+                        target_date=datetime.strptime(milestone_data['target_date'], '%Y-%m-%d').date() if milestone_data.get('target_date') else None,
+                        completed=milestone_data['completed'],
+                        status=milestone_data['status'],
+                        calculation=milestone_data.get('calculation'),
+                        accordion_details=milestone_data.get('accordion_details'),
+                        timeline=milestone_data.get('timeline')
+                    )
 
-            if 'bestMatches' in data:
-                results = [{'symbol': item['1. symbol'], 'name': item['2. name']} for item in data['bestMatches']]
-                return Response(results)
-            else:
-                return Response([], status=status.HTTP_200_OK)
-        except (requests.exceptions.RequestException, ValueError) as e: # ValueError for json decoding
-            logger.error(f"Failed to search stock symbols for {keywords}: {e}")
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    # Create financial products if they exist
+                    if 'products' in milestone_data:
+                        for product_data in milestone_data['products']:
+                            FinancialProduct.objects.create(
+                                milestone=milestone,
+                                type=product_data.get('type'),
+                                name=product_data['name'],
+                                amount=Decimal(str(product_data['amount'])) if product_data.get('amount') else None,
+                                percentage=product_data['percentage']
+                            )
+
+                # Serialize and return the created goal
+                serializer = GoalSerializer(goal)
+                logger.info(f"Goal saved to database with ID: {goal.id}")
+
+                return Response({
+                    'success': True,
+                    'goal': serializer.data,
+                    'message': f"I've created a new goal for you: {goal_data['title']}"
+                })
+
+        except Exception as db_error:
+            logger.error(f"Database error saving goal: {db_error}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+
+            # Return the goal data even if database save fails
+            return Response({
+                'success': True,
+                'goal': complete_goal,
+                'message': f"I've created a new goal for you: {goal_data['title']} (Note: Saved temporarily)"
+            })
+
+    except ValueError as e:
+        # Handle missing API key
+        logger.error(f"AI Coach configuration error: {e}")
+        logger.error(f"Error details: {type(e).__name__}: {str(e)}")
+        return Response({
+            'success': False,
+            'error': 'AI Coach service is not properly configured',
+            'message': 'AI Coach is currently unavailable. Please contact support.',
+            'details': str(e)
+        }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    except Exception as e:
+        logger.error(f"Error in AI create goal: {e}")
+        logger.error(f"Exception type: {type(e).__name__}")
+        logger.error(f"Exception details: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+
+        # Check for specific API errors
+        error_msg = str(e).lower()
+        if "api key" in error_msg or "permission" in error_msg or "401" in error_msg:
+            return Response({
+                'success': False,
+                'error': 'API authentication failed',
+                'message': 'I\'m having trouble accessing my AI capabilities due to an API configuration issue.',
+                'details': str(e)
+            }, status=status.HTTP_401_UNAUTHORIZED)
+
+        return Response({
+            'success': False,
+            'error': 'Failed to create goal',
+            'message': 'I\'m having trouble creating a goal right now. Please try again later.',
+            'details': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

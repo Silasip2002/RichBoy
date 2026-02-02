@@ -1,19 +1,24 @@
 import React from 'react';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
-import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import SettingsIcon from '@mui/icons-material/Settings';
 import AccountCircle from '@mui/icons-material/AccountCircle';
 import MenuIcon from '@mui/icons-material/Menu';
 import Box from '@mui/material/Box';
+import richBoyLogo from '../resource/logo2.png';
+import Image from 'next/image';
+import { useAuth } from '../contexts/AuthContext';
+import { Avatar } from '@mui/material';
 
 interface HeaderProps {
   handleDrawerToggle: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ handleDrawerToggle }) => {
+  const { user } = useAuth();
+
   return (
     <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
       <Toolbar>
@@ -26,9 +31,17 @@ const Header: React.FC<HeaderProps> = ({ handleDrawerToggle }) => {
         >
           <MenuIcon />
         </IconButton>
-        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-          RichBoy
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
+          <Image
+            src={richBoyLogo}
+            alt="RichBoy Logo"
+            width={140}
+            height={40}
+            style={{
+              marginRight: '10px'
+            }}
+          />
+        </Box>
         <Box sx={{ display: { xs: 'none', md: 'flex' } }}>
           <IconButton
             size="large"
@@ -51,7 +64,11 @@ const Header: React.FC<HeaderProps> = ({ handleDrawerToggle }) => {
             aria-haspopup="true"
             color="inherit"
           >
-            <AccountCircle />
+            {user?.profile_picture ? (
+              <Avatar alt={user.display_name || 'User'} src={user.profile_picture} sx={{ width: 32, height: 32 }} />
+            ) : (
+              <AccountCircle />
+            )}
           </IconButton>
         </Box>
       </Toolbar>
