@@ -4,6 +4,8 @@
 
 RichBoy is a next-generation finance management application capable of more than just tracking expenses. By leveraging advanced **Large Language Models (Google Gemini)** and **LangChain**, RichBoy acts as a personal financial advisor, analyzing your assets, understanding your risk tolerance, and guiding you toward financial freedom with data-driven investment suggestions.
 
+![RichBoy Demo](richyBoy.gif)
+
 ## 🚀 Key Features
 
 ### 📊 Phase 1: Core Management
