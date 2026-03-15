@@ -11,7 +11,6 @@ import {
   Skeleton,
   Alert,
   Fade,
-  Chip,
 } from '@mui/material';
 import {
   Send,
@@ -414,7 +413,7 @@ const Goals: React.FC = () => {
               sx={{ mb: 2 }}
               icon={<AutoAwesome />}
             >
-              I'm creating a goal for you based on our conversation...
+              I&apos;m creating a goal for you based on our conversation...
             </Alert>
           </Fade>
 
@@ -470,7 +469,7 @@ const Goals: React.FC = () => {
               <Button
                 key={category.key}
                 variant={selectedCategory === category.key ? 'contained' : 'outlined'}
-                onClick={() => setSelectedCategory(category.key as any)}
+                onClick={() => setSelectedCategory(category.key as 'savings' | 'debt_repayment' | 'investment')}
                 sx={{
                   display: 'flex',
                   alignItems: 'center',

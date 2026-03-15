@@ -7,7 +7,6 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import AccountCircle from '@mui/icons-material/AccountCircle';
 import MenuIcon from '@mui/icons-material/Menu';
 import Box from '@mui/material/Box';
-import richBoyLogo from '../resource/logo2.png';
 import Image from 'next/image';
 import { useAuth } from '../contexts/AuthContext';
 import { Avatar } from '@mui/material';
@@ -33,12 +32,14 @@ const Header: React.FC<HeaderProps> = ({ handleDrawerToggle }) => {
         </IconButton>
         <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
           <Image
-            src={richBoyLogo}
+            src="/logo2.png"
             alt="RichBoy Logo"
             width={140}
             height={40}
+            priority
             style={{
-              marginRight: '10px'
+              marginRight: '10px',
+              objectFit: 'contain'
             }}
           />
         </Box>
