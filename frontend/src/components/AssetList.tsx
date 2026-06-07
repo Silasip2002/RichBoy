@@ -50,7 +50,7 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
 
 
   const [editAssetOpen, setEditAssetOpen] = React.useState(false);
-  const [editingAsset, setEditingAsset] = React.useState<any | null>(null);
+  const [editingAsset, setEditingAsset] = React.useState<Asset | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false);
   const [deletingAssetId, setDeletingAssetId] = React.useState<number | null>(null);
   const [errors, setErrors] = React.useState<{ [key: string]: string }>({});
@@ -245,7 +245,7 @@ const AssetList: React.FC<{ assets: Asset[], setAssets: React.Dispatch<React.Set
       return;
     }
 
-    const newErrors = validate(newAsset as any);
+    const newErrors = validate(newAsset as unknown as Asset);
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
